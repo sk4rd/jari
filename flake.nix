@@ -20,7 +20,6 @@
             rustfmt
             # Nix
             nil
-            nix-direnv
             nixfmt
           ];
         };
