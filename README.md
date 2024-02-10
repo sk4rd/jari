@@ -18,7 +18,7 @@ straightforward. It is recommended to install it in the 'Multi-user'
 configuration. Make sure you have **systemd** on your system and
 **SELinux** is disabled.
 
-To install Nix run the following command in your terminal:
+To install Nix, run the following command in your terminal:
 
 ```
 sh <(curl -L https://nixos.org/nix/install) --daemon
@@ -50,7 +50,7 @@ manually or update Windows.
 The [automatic setup of
 WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) is
 simple. By running the following snippet in your terminal, Ubuntu will
-be installed as your default linux distribution.
+be installed as your default Linux distribution.
 
 ```
 wsl --install
@@ -73,3 +73,72 @@ your shell.
 In order to set up WSL2 manually on older builds of windows, please
 refer to the [Microsoft
 documentation](https://learn.microsoft.com/en-us/windows/wsl/install-manual).
+
+### Using the Flake
+In Nix, flakes are still an experimental feature. To use our flake,
+you'll have to enable `flakes` and preferably `nix-command`. You can
+achieve this by editing the Nix config file.
+
+Create the Nix config directory, if it doesn't already exist:
+
+```
+mkdir -p ~/.config/nix
+```
+
+After you've created the directory run the following command, to
+enable `flakes` and `nix-command`:
+
+```
+echo "experimental-features = flakes nix-command" > ~/.config/nix/nix.conf
+```
+
+Now you'll be able to use the new `nix` command and take advantage of
+flakes.
+
+#### Entering the DevShell
+To enter the development shell, navigate to the *jari* project
+directory:
+
+```
+cd jari/
+```
+
+Then, simply run the following command:
+
+```
+nix develop .
+```
+
+The above will have put you in the development shell and you're now
+ready to hack away!
+
+#### Automatic DevShell Entry (Recommended)
+Running `nix develop .` can get quite tedious after some time. To
+mitigate having to manually enter the development shell, we can use
+[direnv](https://github.com/direnv/direnv) with the
+[nix-direnv](https://github.com/nix-community/nix-direnv) addon. The
+program will automatically source the flakes' shell and ensure that
+you're all set up.
+
+First we'll have to install `direnv` and `nix-direnv` using our newly
+enabled `nix` command:
+
+```
+nix profile install nixpkgs#direnv nixpkgs#nix-direnv
+```
+
+After that, direnv needs to be configured to use the nix-direnv
+'plugin':
+
+```
+mkdir -p ~/.config/direnv;
+echo "source \$HOME/.nix-profile/share/nix-direnv/direnvrc" > ~/.config/direnv/direnvrc
+```
+
+Now you're ready to use `direnv`! You may enter the *jari* directory
+and allow the flake to be sourced automatically:
+
+```
+direnv allow .
+```
+
