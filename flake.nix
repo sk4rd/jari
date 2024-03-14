@@ -19,6 +19,8 @@
             rust-analyzer
             rustc
             rustfmt
+            # Javascript
+            nodePackages_latest.typescript-language-server
             # Nix
             nil
             nixfmt
