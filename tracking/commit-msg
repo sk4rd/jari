@@ -1,0 +1,3 @@
+#! /bin/sh
+/bin/sh "$(git rev-parse --show-toplevel)/tracking/record.sh" commit
+git add "$(git rev-parse --show-toplevel)/tracking"
