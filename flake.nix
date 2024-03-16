@@ -25,7 +25,7 @@
             nil
             nixfmt
           ];
-          shellHook = "/bin/sh \"$(git rev-parse --show-toplevel)/tracking/record.sh\" clockin";
+          shellHook = "git pull; /bin/sh \"$(git rev-parse --show-toplevel)/tracking/record.sh\" clockin";
         };
       });
     };
