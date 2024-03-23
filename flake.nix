@@ -19,6 +19,7 @@
             rust-analyzer
             rustc
             rustfmt
+            cargo-watch
             # Javascript
             nodePackages_latest.typescript-language-server
             # Nix
