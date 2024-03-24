@@ -3,9 +3,15 @@ use actix_web::{
 };
 use clap::Parser;
 use derive_more::{Display, Error};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tokio::sync::RwLock;
+use tokio::{
+    select,
+    sync::RwLock,
+    time::{interval, Duration, Instant},
+};
+use tokio_stream::wrappers::IntervalStream;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -16,21 +22,21 @@ struct Args {
 #[derive(Debug, Display, Error)]
 enum PageError {
     #[display(fmt = "Internal Error")]
-    LockError,
+    Internal,
     #[display(fmt = "Couldn't find Page")]
-    UnknownPage,
+    NotFound,
 }
 
 impl ResponseError for PageError {
     fn status_code(&self) -> StatusCode {
         match self {
-            Self::LockError => StatusCode::INTERNAL_SERVER_ERROR,
-            Self::UnknownPage => StatusCode::NOT_FOUND,
+            Self::Internal => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::NotFound => StatusCode::NOT_FOUND,
         }
     }
 }
 
-type AppState = &'static RwLock<HashMap<String, RadioState>>;
+type AppState = &'static RwLock<HashMap<String, RwLock<RadioState>>>;
 
 #[routes]
 #[get("/")]
@@ -65,7 +71,9 @@ async fn radio_page(
         .read()
         .await
         .get(&id)
-        .ok_or(PageError::UnknownPage)?
+        .ok_or(PageError::NotFound)?
+        .read()
+        .await
         .clone();
     Ok(HttpResponse::Ok().body(format!("Radio {title} ({id})\n {description}")))
 }
@@ -93,25 +101,31 @@ async fn radio_config(
     state: web::Data<AppState>,
 ) -> impl Responder {
     let id = path.into_inner();
-    state.write().await.insert(id.clone(), new_state.clone());
+    state
+        .write()
+        .await
+        .insert(id.clone(), RwLock::new(new_state.clone()));
     HttpResponse::Ok().body(format!("Edited {id} with {}", new_state.title))
+}
+
+async fn update_hls(_instant: Instant, _data: AppState) {
+    // TODO: Update the HLS data on to instant
+    println!("{}µs", _instant.elapsed().as_micros())
 }
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let args = Args::parse();
     let port = args.port.unwrap_or(8080);
-    let data: AppState = Box::<tokio::sync::RwLock<HashMap<String, RadioState>>>::leak(Box::new(
-        RwLock::new(HashMap::new()),
-    ));
+    let data: AppState = Box::leak(Box::new(RwLock::new(HashMap::new())));
     data.write().await.insert(
         "test".to_owned(),
-        RadioState {
+        RwLock::new(RadioState {
             title: "Test".to_owned(),
             description: "This is a test station, \n ignore".to_owned(),
-        },
+        }),
     );
-    HttpServer::new(move || {
+    let server = HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(data))
             .service(start_page)
@@ -120,6 +134,13 @@ async fn main() -> std::io::Result<()> {
             .service(radio_edit)
     })
     .bind(("0.0.0.0", port))?
-    .run()
-    .await
+    .run();
+    let hls = IntervalStream::new(interval(Duration::from_secs(10)))
+        .then(|instant| update_hls(instant, data))
+        .collect::<()>();
+    // NOTE: Only use Futures that only finish on unrecoverable errors (but we still want to exit gracefully)
+    select! {
+        x = server => return x,
+        _ = hls => unreachable!()
+    }
 }
