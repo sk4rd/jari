@@ -3,15 +3,18 @@ use actix_web::{
 };
 use clap::Parser;
 use derive_more::{Display, Error};
-use futures::StreamExt;
+use futures::{channel::mpsc::TryRecvError, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{mpsc::channel, Arc},
+};
 use tokio::{
     select,
-    sync::RwLock,
+    sync::{mpsc::unbounded_channel, RwLock},
     time::{interval, Duration, Instant},
 };
-use tokio_stream::wrappers::IntervalStream;
+use tokio_stream::wrappers::{ReceiverStream, UnboundedReceiverStream};
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -33,7 +36,12 @@ impl ResponseError for PageError {
     }
 }
 
-type AppState = Arc<RwLock<HashMap<String, RwLock<RadioState>>>>;
+type AppState = Arc<
+    RwLock<(
+        HashMap<String, RwLock<RadioState>>,
+        std::sync::mpsc::Sender<ToBlocking>,
+    )>,
+>;
 
 #[routes]
 #[get("/")]
@@ -67,6 +75,7 @@ async fn radio_page(
     let RadioState { title, description } = state
         .read()
         .await
+        .0
         .get(&id)
         .ok_or(PageError::NotFound)?
         .read()
@@ -101,6 +110,7 @@ async fn radio_config(
     state
         .write()
         .await
+        .0
         .insert(id.clone(), RwLock::new(new_state.clone()));
     HttpResponse::Ok().body(format!("Edited {id} with {}", new_state.title))
 }
@@ -110,18 +120,46 @@ async fn update_hls(_instant: Instant, _data: AppState) {
     println!("{}µs", _instant.elapsed().as_micros())
 }
 
+enum ToBlocking {}
+
+fn blocking_main(
+    _atx: tokio::sync::mpsc::UnboundedSender<Instant>,
+    srx: std::sync::mpsc::Receiver<ToBlocking>,
+    interval: Duration,
+) {
+    let mut last = std::time::Instant::now();
+    loop {
+        match srx.try_recv() {
+            Ok(msg) => match msg {},
+            Err(std::sync::mpsc::TryRecvError::Empty) => {}
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => return,
+        }
+        let diff = last.elapsed();
+        if diff > interval {
+            // TODO: send/create next fragment
+            last += interval;
+            _atx.send(last.clone().into()).unwrap();
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let args = Args::parse();
     let port = args.port.unwrap_or(8080);
-    let data: AppState = Arc::new(RwLock::new(HashMap::new()));
-    data.write().await.insert(
+    let (atx, arx) = unbounded_channel();
+    let (stx, srx) = channel();
+    let data: AppState = Arc::new(RwLock::new((HashMap::new(), stx)));
+    data.write().await.0.insert(
         "test".to_owned(),
         RwLock::new(RadioState {
             title: "Test".to_owned(),
             description: "This is a test station, \n ignore".to_owned(),
         }),
     );
+
+    std::thread::spawn(|| blocking_main(atx, srx, Duration::from_secs(10)));
+
     let sdata = data.clone();
 
     let server = HttpServer::new(move || {
@@ -136,7 +174,7 @@ async fn main() -> std::io::Result<()> {
     .run();
     let hdata = data.clone();
     let hls = tokio::task::spawn(
-        IntervalStream::new(interval(Duration::from_secs(10)))
+        UnboundedReceiverStream::new(arx)
             .then(move |instant| update_hls(instant, hdata.clone()))
             .collect::<()>(),
     );
