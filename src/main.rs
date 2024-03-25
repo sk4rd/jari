@@ -5,7 +5,7 @@ use clap::Parser;
 use derive_more::{Display, Error};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 use tokio::{
     select,
     sync::RwLock,
@@ -21,8 +21,6 @@ struct Args {
 
 #[derive(Debug, Display, Error)]
 enum PageError {
-    #[display(fmt = "Internal Error")]
-    Internal,
     #[display(fmt = "Couldn't find Page")]
     NotFound,
 }
@@ -30,13 +28,12 @@ enum PageError {
 impl ResponseError for PageError {
     fn status_code(&self) -> StatusCode {
         match self {
-            Self::Internal => StatusCode::INTERNAL_SERVER_ERROR,
             Self::NotFound => StatusCode::NOT_FOUND,
         }
     }
 }
 
-type AppState = &'static RwLock<HashMap<String, RwLock<RadioState>>>;
+type AppState = Arc<RwLock<HashMap<String, RwLock<RadioState>>>>;
 
 #[routes]
 #[get("/")]
@@ -117,7 +114,7 @@ async fn update_hls(_instant: Instant, _data: AppState) {
 async fn main() -> std::io::Result<()> {
     let args = Args::parse();
     let port = args.port.unwrap_or(8080);
-    let data: AppState = Box::leak(Box::new(RwLock::new(HashMap::new())));
+    let data: AppState = Arc::new(RwLock::new(HashMap::new()));
     data.write().await.insert(
         "test".to_owned(),
         RwLock::new(RadioState {
@@ -125,9 +122,11 @@ async fn main() -> std::io::Result<()> {
             description: "This is a test station, \n ignore".to_owned(),
         }),
     );
+    let sdata = data.clone();
+
     let server = HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::new(data))
+            .app_data(web::Data::new(sdata.clone()))
             .service(start_page)
             .service(auth_page)
             .service(radio_page)
@@ -135,9 +134,12 @@ async fn main() -> std::io::Result<()> {
     })
     .bind(("0.0.0.0", port))?
     .run();
-    let hls = IntervalStream::new(interval(Duration::from_secs(10)))
-        .then(|instant| update_hls(instant, data))
-        .collect::<()>();
+    let hdata = data.clone();
+    let hls = tokio::task::spawn(
+        IntervalStream::new(interval(Duration::from_secs(10)))
+            .then(move |instant| update_hls(instant, hdata.clone()))
+            .collect::<()>(),
+    );
     // NOTE: Only use Futures that only finish on unrecoverable errors (but we still want to exit gracefully)
     select! {
         x = server => return x,
