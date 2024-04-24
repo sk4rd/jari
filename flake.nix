@@ -1,8 +1,10 @@
 {
   description = "A development shell for the Jari project";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
-  inputs.flake-utils.url = "github:numtide/flake-utils";
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
 
   outputs = { self, flake-utils, nixpkgs }:
     flake-utils.lib.eachDefaultSystem (system:
@@ -17,13 +19,15 @@
             rustc
             rustfmt
             cargo-watch
+
             # Javascript
             nodePackages_latest.typescript-language-server
+
             # Nix
             nil
             nixfmt
-
           ];
+
           shellHook = ''
             git pull; /bin/sh "$(git rev-parse --show-toplevel)/tracking/record.sh" clockin; rm $(git rev-parse --show-toplevel)/.git/hooks/*; cp $(git rev-parse --show-toplevel)/tracking/pre-commit $(git rev-parse --show-toplevel)/.git/hooks'';
         };
