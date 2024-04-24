@@ -2,16 +2,14 @@
   description = "A development shell for the Jari project";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
+  inputs.flake-utils.url = "github:numtide/flake-utils";
+  inputs.flake-utils.inputs.nixpkgs.follows = "nixpkgs";
 
-  outputs = { self, nixpkgs }:
-    let
-      allSystems = [ "x86_64-linux" "aarch64-linux" ];
-      forAllSystems = f:
-        nixpkgs.lib.genAttrs allSystems
-        (system: f { pkgs = import nixpkgs { inherit system; }; });
-    in {
-      devShells = forAllSystems ({ pkgs }: {
-        default = pkgs.mkShell {
+  outputs = { self, flake-utils, nixpkgs }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let pkgs = nixpkgs.legacyPackages.${system};
+      in {
+        devShells.default = pkgs.mkShell {
           packages = with pkgs; [
             # Rust
             cargo
@@ -25,9 +23,10 @@
             # Nix
             nil
             nixfmt
+
           ];
-          shellHook = "git pull; /bin/sh \"$(git rev-parse --show-toplevel)/tracking/record.sh\" clockin; rm $(git rev-parse --show-toplevel)/.git/hooks/*; cp $(git rev-parse --show-toplevel)/tracking/pre-commit $(git rev-parse --show-toplevel)/.git/hooks";
+          shellHook = ''
+            git pull; /bin/sh "$(git rev-parse --show-toplevel)/tracking/record.sh" clockin; rm $(git rev-parse --show-toplevel)/.git/hooks/*; cp $(git rev-parse --show-toplevel)/tracking/pre-commit $(git rev-parse --show-toplevel)/.git/hooks'';
         };
       });
-    };
 }
