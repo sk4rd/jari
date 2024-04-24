@@ -25,7 +25,6 @@
 
             # Nix
             nil
-            nixfmt
           ];
 
           shellHook = ''
