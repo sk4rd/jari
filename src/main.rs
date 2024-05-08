@@ -157,6 +157,13 @@ async fn main() -> std::io::Result<()> {
             description: "This is a test station, \n ignore".to_owned(),
         }),
     );
+    data.write().await.0.insert(
+        "test2".to_owned(),
+        RwLock::new(RadioState {
+            title: "Another Test".to_owned(),
+            description: "This is another test station, \n ignore".to_owned(),
+        }),
+    );
 
     std::thread::spawn(|| blocking_main(atx, srx, Duration::from_secs(10)));
 
