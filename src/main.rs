@@ -42,13 +42,11 @@ impl ResponseError for PageError {
 }
 
 /// Global async app state
-type AppState = Arc<(
-    RwLock<(
-        HashMap<String, RwLock<RadioState>>,
-        std::sync::mpsc::Sender<ToBlocking>,
-    )>,
-    (&'static str, &'static str, &'static str),
-)>;
+struct AppState {
+    pages: (&'static str, &'static str, &'static str),
+    to_blocking: std::sync::mpsc::Sender<ToBlocking>,
+    radio_states: RwLock<HashMap<String, RwLock<RadioState>>>,
+}
 
 #[routes]
 #[get("/")]
@@ -77,14 +75,13 @@ struct RadioState {
 #[get("/{radio}/index.html")]
 async fn radio_page(
     path: web::Path<String>,
-    state: web::Data<AppState>,
+    state: web::Data<Arc<AppState>>,
 ) -> Result<HttpResponse, PageError> {
     let id = path.into_inner();
     let RadioState { title, description } = state
-        .0
+        .radio_states
         .read()
         .await
-        .0
         .get(&id)
         .ok_or(PageError::NotFound)?
         .read()
@@ -114,20 +111,19 @@ struct Config {
 async fn radio_config(
     path: web::Path<String>,
     web::Json(new_state): web::Json<RadioState>,
-    state: web::Data<AppState>,
+    state: web::Data<Arc<AppState>>,
 ) -> impl Responder {
     let id = path.into_inner();
     state
-        .0
+        .radio_states
         .write()
         .await
-        .0
         .insert(id.clone(), RwLock::new(new_state.clone()));
     HttpResponse::Ok().body(format!("Edited {id} with {}", new_state.title))
 }
 
 /// Function to add the new segments and set the new current segment
-async fn update_hls(_instant: Instant, _data: AppState) {
+async fn update_hls(_instant: Instant, _data: Arc<AppState>) {
     // TODO: Update the HLS data on to instant
     println!("{}µs", _instant.elapsed().as_micros())
 }
@@ -186,8 +182,12 @@ async fn main() -> std::io::Result<()> {
     };
     let (atx, arx) = unbounded_channel();
     let (stx, srx) = channel();
-    let data: AppState = Arc::new((RwLock::new((HashMap::new(), stx)), pages));
-    data.0.write().await.0.insert(
+    let data: Arc<AppState> = Arc::new(AppState {
+        pages,
+        to_blocking: stx,
+        radio_states: RwLock::new(HashMap::new()),
+    });
+    data.radio_states.write().await.insert(
         "test".to_owned(),
         RwLock::new(RadioState {
             title: "Test".to_owned(),
