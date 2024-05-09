@@ -22,6 +22,7 @@ struct Args {
     port: Option<u16>,
 }
 
+/// Errors our webpages can return
 #[derive(Debug, Display, Error)]
 enum PageError {
     #[display(fmt = "Couldn't find Page")]
@@ -36,6 +37,7 @@ impl ResponseError for PageError {
     }
 }
 
+/// Global async app state
 type AppState = Arc<
     RwLock<(
         HashMap<String, RwLock<RadioState>>,
@@ -57,6 +59,7 @@ async fn auth_page() -> impl Responder {
     HttpResponse::Ok()
 }
 
+/// Data for the radios
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct RadioState {
     title: String,
@@ -93,6 +96,7 @@ async fn radio_edit(path: web::Path<String>) -> impl Responder {
     HttpResponse::Ok().body(format!("Edit {id}"))
 }
 
+/// Radio Config sent by the frontend
 #[derive(Deserialize, Serialize)]
 struct Config {
     title: String,
@@ -115,13 +119,15 @@ async fn radio_config(
     HttpResponse::Ok().body(format!("Edited {id} with {}", new_state.title))
 }
 
+/// Function to add the new segments and set the new current segment
 async fn update_hls(_instant: Instant, _data: AppState) {
     // TODO: Update the HLS data on to instant
     println!("{}µs", _instant.elapsed().as_micros())
 }
 
+/// Messages, that can be sent to the blocking thread (mainly audio)
 enum ToBlocking {}
-
+/// The blocking thread, contains mainly audio processing
 fn blocking_main(
     _atx: tokio::sync::mpsc::UnboundedSender<Instant>,
     srx: std::sync::mpsc::Receiver<ToBlocking>,
@@ -155,13 +161,6 @@ async fn main() -> std::io::Result<()> {
         RwLock::new(RadioState {
             title: "Test".to_owned(),
             description: "This is a test station, \n ignore".to_owned(),
-        }),
-    );
-    data.write().await.0.insert(
-        "test2".to_owned(),
-        RwLock::new(RadioState {
-            title: "Another Test".to_owned(),
-            description: "This is another test station, \n ignore".to_owned(),
         }),
     );
 
