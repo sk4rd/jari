@@ -1,15 +1,18 @@
+use actix::fut::Ready;
 use actix_web::{
     error::ResponseError, http::StatusCode, routes, web, App, HttpResponse, HttpServer, Responder,
 };
 use clap::Parser;
 use derive_more::{Display, Error};
-use futures::{channel::mpsc::TryRecvError, StreamExt};
+use futures::{channel::mpsc::TryRecvError, future::join_all, join, FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
+    path::{Path, PathBuf},
     sync::{mpsc::channel, Arc},
 };
 use tokio::{
+    fs::read_to_string,
     select,
     sync::{mpsc::unbounded_channel, RwLock},
     time::{interval, Duration, Instant},
@@ -20,6 +23,7 @@ use tokio_stream::wrappers::{ReceiverStream, UnboundedReceiverStream};
 #[command(version, about)]
 struct Args {
     port: Option<u16>,
+    pages: Option<PathBuf>,
 }
 
 /// Errors our webpages can return
@@ -38,12 +42,13 @@ impl ResponseError for PageError {
 }
 
 /// Global async app state
-type AppState = Arc<
+type AppState = Arc<(
     RwLock<(
         HashMap<String, RwLock<RadioState>>,
         std::sync::mpsc::Sender<ToBlocking>,
     )>,
->;
+    (&'static str, &'static str, &'static str),
+)>;
 
 #[routes]
 #[get("/")]
@@ -76,6 +81,7 @@ async fn radio_page(
 ) -> Result<HttpResponse, PageError> {
     let id = path.into_inner();
     let RadioState { title, description } = state
+        .0
         .read()
         .await
         .0
@@ -112,6 +118,7 @@ async fn radio_config(
 ) -> impl Responder {
     let id = path.into_inner();
     state
+        .0
         .write()
         .await
         .0
@@ -153,10 +160,34 @@ fn blocking_main(
 async fn main() -> std::io::Result<()> {
     let args = Args::parse();
     let port = args.port.unwrap_or(8080);
+    let pages = if let Some(path) = args.pages {
+        let mut start_path = path.clone();
+        let mut radio_path = path.clone();
+        let mut edit_path = path.clone();
+        start_path.push("start.html");
+        radio_path.push("radio.html");
+        edit_path.push("edit.html");
+        let files = join_all([
+            read_to_string(start_path),
+            read_to_string(radio_path),
+            read_to_string(edit_path),
+        ])
+        .await
+        .into_iter()
+        .map(|s| s.map(|s| s.leak()))
+        .collect::<Result<Box<_>, _>>()?;
+        (&*files[0], &*files[1], &*files[2])
+    } else {
+        (
+            include_str!("../resources/start.html"),
+            include_str!("../resources/radio.html"),
+            include_str!("../resources/edit.html"),
+        )
+    };
     let (atx, arx) = unbounded_channel();
     let (stx, srx) = channel();
-    let data: AppState = Arc::new(RwLock::new((HashMap::new(), stx)));
-    data.write().await.0.insert(
+    let data: AppState = Arc::new((RwLock::new((HashMap::new(), stx)), pages));
+    data.0.write().await.0.insert(
         "test".to_owned(),
         RwLock::new(RadioState {
             title: "Test".to_owned(),
