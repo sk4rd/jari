@@ -10,12 +10,14 @@ use tokio::{
     fs::read_to_string,
     select,
     sync::{mpsc::unbounded_channel, RwLock},
-    time::{Duration, Instant},
+    time::Duration,
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 mod blocking;
 use blocking::ToBlocking;
+
+mod hls;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -123,12 +125,6 @@ async fn radio_config(
     HttpResponse::Ok().body(format!("Edited {id} with {}", new_state.title))
 }
 
-/// Function to add the new segments and set the new current segment
-async fn update_hls(_instant: Instant, _data: Arc<AppState>) {
-    // TODO: Update the HLS data on to instant
-    println!("{}µs", _instant.elapsed().as_micros())
-}
-
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let args = Args::parse();
@@ -197,7 +193,7 @@ async fn main() -> std::io::Result<()> {
     let hdata = data.clone();
     let hls = tokio::task::spawn(
         UnboundedReceiverStream::new(arx)
-            .then(move |instant| update_hls(instant, hdata.clone()))
+            .then(move |instant| hls::update(instant, hdata.clone()))
             .collect::<()>(),
     );
     // Run all tasks (until one finishes)
