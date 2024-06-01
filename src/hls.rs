@@ -19,16 +19,18 @@ impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
             .for_each(|(playlist, segment)| playlist.add_segment(segment));
     }
     pub fn format_master(&self, base_path: &str, bandwidths: [usize; S]) -> String {
+        // TODO: Confirm/Test this
         let playlist_descrs = (0..P).map(|i| {
             let bandwidth = bandwidths[i];
             format!(
                 "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"{bandwidth}\",NAME=\"{bandwidth}\",AUTOSELECT=YES,DEFAULT=YES
-            #EXT-X-STREAM-INF:BANDWIDTH={bandwidth},CODECS=\"aac,mp3\"
+            #EXT-X-STREAM-INF:BANDWIDTH={bandwidth},CODECS=\"mp3\"
             {base_path}/{bandwidth}/playlist.m3u8"
             )
         });
         format!(
-            "#EXTM3U{}",
+            "#EXTM3U
+            {}",
             playlist_descrs
                 .reduce(|a, e| format!("{a}\n{e}"))
                 .unwrap_or(String::new())
@@ -44,6 +46,7 @@ impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
 }
 
 struct MediaPlaylist<const S: usize> {
+    current_index: usize,
     current: usize,
     segments: [Segment; S],
 }
@@ -51,20 +54,40 @@ struct MediaPlaylist<const S: usize> {
 impl<const S: usize> MediaPlaylist<S> {
     const fn new(segments: [Segment; S]) -> Self {
         Self {
-            current: S - 1,
+            current_index: S - 1,
+            current: 0,
             segments,
         }
     }
     fn add_segment(&mut self, segment: Segment) {
-        let i = if self.current < S - 1 {
-            self.current + 1
+        let i = if self.current_index < S - 1 {
+            self.current_index + 1
         } else {
             0
         };
         self.segments[i] = segment;
     }
     fn format(&self) -> String {
-        todo!()
+        // TODO: Confirm/Test this
+        let start = self.current - S;
+        let segment_descrs = (0..S).map(|i| {
+            format!(
+                "#EXTINF:10.000
+            {i}.acc"
+            )
+        });
+        format!(
+            "#EXTM3U
+            #EXT-X-VERSION:3
+            #EXT-X-TARGETDURATION:10
+            #ID3-EQUIV-TDTG:2023-10-02T03:18:35
+            #EXT-X-PLAYLIST-TYPE:EVENT
+            #EXT-X-MEDIA-SEQUENCE:{start}
+            {}",
+            segment_descrs
+                .reduce(|a, e| format!("{a}\n{e}"))
+                .unwrap_or(String::new())
+        )
     }
 }
 
