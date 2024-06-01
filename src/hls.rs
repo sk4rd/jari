@@ -18,8 +18,21 @@ impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
             .zip(segments)
             .for_each(|(playlist, segment)| playlist.add_segment(segment));
     }
-    pub fn format_master(&self) -> String {
-        todo!()
+    pub fn format_master(&self, base_path: &str, bandwidths: [usize; S]) -> String {
+        let playlist_descrs = (0..P).map(|i| {
+            let bandwidth = bandwidths[i];
+            format!(
+                "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"{bandwidth}\",NAME=\"{bandwidth}\",AUTOSELECT=YES,DEFAULT=YES
+            #EXT-X-STREAM-INF:BANDWIDTH={bandwidth},CODECS=\"aac,mp3\"
+            {base_path}/{bandwidth}/playlist.m3u8"
+            )
+        });
+        format!(
+            "#EXTM3U{}",
+            playlist_descrs
+                .reduce(|a, e| format!("{a}\n{e}"))
+                .unwrap_or(String::new())
+        )
     }
     pub fn format_media(&self) -> [String; P] {
         let mut out = [""; P].map(|s| s.to_owned());
