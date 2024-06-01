@@ -19,6 +19,9 @@ use tokio::{
 };
 use tokio_stream::wrappers::{ReceiverStream, UnboundedReceiverStream};
 
+mod blocking;
+use blocking::ToBlocking;
+
 #[derive(Parser, Debug)]
 #[command(version, about)]
 struct Args {
@@ -128,30 +131,6 @@ async fn update_hls(_instant: Instant, _data: Arc<AppState>) {
     println!("{}µs", _instant.elapsed().as_micros())
 }
 
-/// Messages, that can be sent to the blocking thread (mainly audio)
-enum ToBlocking {}
-/// The blocking thread, contains mainly audio processing
-fn blocking_main(
-    _atx: tokio::sync::mpsc::UnboundedSender<Instant>,
-    srx: std::sync::mpsc::Receiver<ToBlocking>,
-    interval: Duration,
-) {
-    let mut last = std::time::Instant::now();
-    loop {
-        match srx.try_recv() {
-            Ok(msg) => match msg {},
-            Err(std::sync::mpsc::TryRecvError::Empty) => {}
-            Err(std::sync::mpsc::TryRecvError::Disconnected) => return,
-        }
-        let diff = last.elapsed();
-        if diff > interval {
-            // TODO: send/create next fragment
-            last += interval;
-            _atx.send(last.clone().into()).unwrap();
-        }
-    }
-}
-
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let args = Args::parse();
@@ -195,7 +174,7 @@ async fn main() -> std::io::Result<()> {
         }),
     );
 
-    std::thread::spawn(|| blocking_main(atx, srx, Duration::from_secs(10)));
+    std::thread::spawn(|| blocking::main(atx, srx, Duration::from_secs(10)));
 
     let sdata = data.clone();
 
