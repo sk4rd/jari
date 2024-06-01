@@ -177,25 +177,29 @@ async fn main() -> std::io::Result<()> {
     std::thread::spawn(|| blocking::main::<1>(atx, srx, Duration::from_secs(10)));
 
     // Start web server task
-    let sdata = data.clone();
-    let server = HttpServer::new(move || {
-        App::new()
-            .app_data(web::Data::new(sdata.clone()))
-            .service(start_page)
-            .service(auth_page)
-            .service(radio_page)
-            .service(radio_edit)
-    })
-    .bind(("0.0.0.0", port))?
-    .run();
+    let server = {
+        let data = data.clone();
+        HttpServer::new(move || {
+            App::new()
+                .app_data(web::Data::new(data.clone()))
+                .service(start_page)
+                .service(auth_page)
+                .service(radio_page)
+                .service(radio_edit)
+        })
+        .bind(("0.0.0.0", port))?
+        .run()
+    };
 
     // Start HLS worker task
-    let hdata = data.clone();
-    let hls = tokio::task::spawn(
-        UnboundedReceiverStream::new(arx)
-            .then(move |data| hls::update(data, hdata.clone()))
-            .collect::<()>(),
-    );
+    let hls = {
+        let data = data.clone();
+        tokio::task::spawn(
+            UnboundedReceiverStream::new(arx)
+                .then(move |frame| hls::update(frame, data.clone()))
+                .collect::<()>(),
+        )
+    };
     // Run all tasks (until one finishes)
     // NOTE: Only use Futures that only finish on unrecoverable errors (but we still want to exit gracefully)
     select! {
