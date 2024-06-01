@@ -7,7 +7,7 @@ pub enum ToBlocking {}
 /// The blocking thread, contains mainly audio processing
 pub fn main(
     _atx: tokio::sync::mpsc::UnboundedSender<Instant>,
-    srx: std::sync::mpsc::Receiver<ToBlocking>,
+    mut srx: tokio::sync::mpsc::UnboundedReceiver<ToBlocking>,
     interval: Duration,
 ) {
     let mut last = std::time::Instant::now();
@@ -15,8 +15,8 @@ pub fn main(
         // Check for messages
         match srx.try_recv() {
             Ok(msg) => match msg {},
-            Err(std::sync::mpsc::TryRecvError::Empty) => {}
-            Err(std::sync::mpsc::TryRecvError::Disconnected) => return,
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {}
+            Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return,
         }
         // Check if interval has been reached
         let diff = last.elapsed();

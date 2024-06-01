@@ -5,11 +5,7 @@ use clap::Parser;
 use derive_more::{Display, Error};
 use futures::{future::join_all, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::{mpsc::channel, Arc},
-};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tokio::{
     fs::read_to_string,
     select,
@@ -46,7 +42,7 @@ impl ResponseError for PageError {
 /// Global async app state
 struct AppState {
     pages: (&'static str, &'static str, &'static str),
-    to_blocking: std::sync::mpsc::Sender<ToBlocking>,
+    to_blocking: tokio::sync::mpsc::UnboundedSender<ToBlocking>,
     radio_states: RwLock<HashMap<String, RwLock<RadioState>>>,
 }
 
@@ -165,7 +161,7 @@ async fn main() -> std::io::Result<()> {
     };
     // Create Channels for communication between blocking and async
     let (atx, arx) = unbounded_channel();
-    let (stx, srx) = channel();
+    let (stx, srx) = unbounded_channel();
     // Create AppState
     let data: Arc<AppState> = Arc::new(AppState {
         pages,
