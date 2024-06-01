@@ -12,11 +12,13 @@ pub fn main(
 ) {
     let mut last = std::time::Instant::now();
     loop {
+        // Check for messages
         match srx.try_recv() {
             Ok(msg) => match msg {},
             Err(std::sync::mpsc::TryRecvError::Empty) => {}
             Err(std::sync::mpsc::TryRecvError::Disconnected) => return,
         }
+        // Check if interval has been reached
         let diff = last.elapsed();
         if diff > interval {
             // TODO: send/create next fragment

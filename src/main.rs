@@ -80,6 +80,7 @@ async fn radio_page(
     state: web::Data<Arc<AppState>>,
 ) -> Result<HttpResponse, PageError> {
     let id = path.into_inner();
+    // Extract Radio State
     let RadioState { title, description } = state
         .radio_states
         .read()
@@ -89,6 +90,7 @@ async fn radio_page(
         .read()
         .await
         .clone();
+    // Return formatted data
     Ok(HttpResponse::Ok().body(format!("Radio {title} ({id})\n {description}")))
 }
 
@@ -116,6 +118,7 @@ async fn radio_config(
     state: web::Data<Arc<AppState>>,
 ) -> impl Responder {
     let id = path.into_inner();
+    // Change or add Radio by inserting into HashMap
     state
         .radio_states
         .write()
@@ -135,12 +138,14 @@ async fn main() -> std::io::Result<()> {
     let args = Args::parse();
     let port = args.port.unwrap_or(8080);
     let pages = if let Some(path) = args.pages {
+        // Get Pages from Files
         let mut start_path = path.clone();
         let mut radio_path = path.clone();
         let mut edit_path = path.clone();
         start_path.push("start.html");
         radio_path.push("radio.html");
         edit_path.push("edit.html");
+        // Read all files
         let files = join_all([
             read_to_string(start_path),
             read_to_string(radio_path),
@@ -158,13 +163,16 @@ async fn main() -> std::io::Result<()> {
             include_str!("../resources/edit.html"),
         )
     };
+    // Create Channels for communication between blocking and async
     let (atx, arx) = unbounded_channel();
     let (stx, srx) = channel();
+    // Create AppState
     let data: Arc<AppState> = Arc::new(AppState {
         pages,
         to_blocking: stx,
         radio_states: RwLock::new(HashMap::new()),
     });
+    // Add test radio
     data.radio_states.write().await.insert(
         "test".to_owned(),
         RwLock::new(RadioState {
@@ -173,10 +181,11 @@ async fn main() -> std::io::Result<()> {
         }),
     );
 
+    // Start blocking thread
     std::thread::spawn(|| blocking::main(atx, srx, Duration::from_secs(10)));
 
+    // Start web server task
     let sdata = data.clone();
-
     let server = HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(sdata.clone()))
@@ -187,12 +196,15 @@ async fn main() -> std::io::Result<()> {
     })
     .bind(("0.0.0.0", port))?
     .run();
+
+    // Start HLS worker task
     let hdata = data.clone();
     let hls = tokio::task::spawn(
         UnboundedReceiverStream::new(arx)
             .then(move |instant| update_hls(instant, hdata.clone()))
             .collect::<()>(),
     );
+    // Run all tasks (until one finishes)
     // NOTE: Only use Futures that only finish on unrecoverable errors (but we still want to exit gracefully)
     select! {
         x = server => return x,
