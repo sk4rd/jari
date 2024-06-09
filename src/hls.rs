@@ -4,6 +4,7 @@ use tokio::time::Instant;
 
 use crate::AppState;
 
+#[derive(Debug, Clone)]
 pub struct MasterPlaylist<const P: usize, const S: usize> {
     playlists: [MediaPlaylist<S>; P],
 }
@@ -45,6 +46,7 @@ impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
     }
 }
 
+#[derive(Debug, Clone)]
 struct MediaPlaylist<const S: usize> {
     current_index: usize,
     current: usize,
@@ -91,6 +93,7 @@ impl<const S: usize> MediaPlaylist<S> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Segment {}
 
 /// Function to add the new segments and set the new current segment
