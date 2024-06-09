@@ -54,14 +54,14 @@ pub struct MediaPlaylist<const S: usize> {
 }
 
 impl<const S: usize> MediaPlaylist<S> {
-    const fn new(segments: [Segment; S]) -> Self {
+    pub const fn new(segments: [Segment; S]) -> Self {
         Self {
             current_index: S - 1,
             current: 0,
             segments,
         }
     }
-    fn add_segment(&mut self, segment: Segment) {
+    pub fn add_segment(&mut self, segment: Segment) {
         let i = if self.current_index < S - 1 {
             self.current_index + 1
         } else {
@@ -69,7 +69,7 @@ impl<const S: usize> MediaPlaylist<S> {
         };
         self.segments[i] = segment;
     }
-    fn format(&self) -> String {
+    pub fn format(&self) -> String {
         // TODO: Confirm/Test this
         let start = self.current - S;
         let segment_descrs = (0..S).map(|i| {
