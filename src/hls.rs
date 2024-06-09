@@ -47,7 +47,7 @@ impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
 }
 
 #[derive(Debug, Clone)]
-struct MediaPlaylist<const S: usize> {
+pub struct MediaPlaylist<const S: usize> {
     current_index: usize,
     current: usize,
     segments: [Segment; S],

@@ -1,5 +1,6 @@
 use actix_web::{
-    error::ResponseError, http::StatusCode, routes, web, App, HttpResponse, HttpServer, Responder,
+    error::ResponseError, get, http::StatusCode, routes, web, App, HttpResponse, HttpServer,
+    Responder,
 };
 use clap::Parser;
 use derive_more::{Display, Error};
@@ -62,11 +63,21 @@ async fn auth_page() -> impl Responder {
     HttpResponse::Ok()
 }
 
-/// Data for the radios
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct RadioState {
+const NUM_BANDWIDTHS: usize = 1;
+const NUM_SEGMENTS: usize = 0;
+
+const BANDWIDTHS: [usize; NUM_BANDWIDTHS] = [22000];
+/// Radio Config sent by the frontend
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct Config {
     title: String,
     description: String,
+}
+/// Data for the radios
+#[derive(Debug, Clone)]
+struct RadioState {
+    config: Config,
+    playlist: hls::MasterPlaylist<NUM_SEGMENTS, NUM_BANDWIDTHS>,
 }
 
 #[routes]
@@ -79,7 +90,7 @@ async fn radio_page(
 ) -> Result<HttpResponse, PageError> {
     let id = path.into_inner();
     // Extract Radio State
-    let RadioState { title, description } = state
+    let Config { title, description } = state
         .radio_states
         .read()
         .await
@@ -87,6 +98,7 @@ async fn radio_page(
         .ok_or(PageError::NotFound)?
         .read()
         .await
+        .config
         .clone();
     // Return formatted data
     Ok(HttpResponse::Ok().body(format!("Radio {title} ({id})\n {description}")))
@@ -101,28 +113,26 @@ async fn radio_edit(path: web::Path<String>) -> impl Responder {
     HttpResponse::Ok().body(format!("Edit {id}"))
 }
 
-/// Radio Config sent by the frontend
-#[derive(Deserialize, Serialize)]
-struct Config {
-    title: String,
-}
-
 #[routes]
 #[post("/{radio}")]
 #[post("/{radio}/")]
 async fn radio_config(
     path: web::Path<String>,
-    web::Json(new_state): web::Json<RadioState>,
+    web::Json(config): web::Json<Config>,
     state: web::Data<Arc<AppState>>,
-) -> impl Responder {
+) -> Result<HttpResponse, PageError> {
     let id = path.into_inner();
     // Change or add Radio by inserting into HashMap
     state
         .radio_states
+        .read()
+        .await
+        .get(&id)
+        .ok_or(PageError::NotFound)?
         .write()
         .await
-        .insert(id.clone(), RwLock::new(new_state.clone()));
-    HttpResponse::Ok().body(format!("Edited {id} with {}", new_state.title))
+        .config = config.clone();
+    Ok(HttpResponse::Ok().body(format!("Edited {id} with {}", config.title)))
 }
 
 #[tokio::main]
@@ -168,13 +178,16 @@ async fn main() -> std::io::Result<()> {
     data.radio_states.write().await.insert(
         "test".to_owned(),
         RwLock::new(RadioState {
-            title: "Test".to_owned(),
-            description: "This is a test station, \n ignore".to_owned(),
+            config: Config {
+                title: "Test".to_owned(),
+                description: "This is a test station, \n ignore".to_owned(),
+            },
+            playlist: hls::MasterPlaylist::new([]),
         }),
     );
 
     // Start blocking thread
-    std::thread::spawn(|| blocking::main::<1>(atx, srx, Duration::from_secs(10)));
+    std::thread::spawn(|| blocking::main::<NUM_BANDWIDTHS>(atx, srx, Duration::from_secs(10)));
 
     // Start web server task
     let server = {
