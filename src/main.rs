@@ -43,7 +43,7 @@ impl ResponseError for PageError {
 }
 
 const NUM_BANDWIDTHS: usize = 1;
-const NUM_SEGMENTS: usize = 0;
+const NUM_SEGMENTS: usize = 1;
 
 const BANDWIDTHS: [usize; NUM_BANDWIDTHS] = [22000];
 /// Radio Config sent by the frontend
@@ -56,7 +56,7 @@ struct Config {
 #[derive(Debug, Clone)]
 struct RadioState {
     config: Config,
-    playlist: hls::MasterPlaylist<NUM_SEGMENTS, NUM_BANDWIDTHS>,
+    playlist: hls::MasterPlaylist<NUM_BANDWIDTHS, NUM_SEGMENTS>,
 }
 /// Global async app state
 struct AppState {
@@ -134,6 +134,8 @@ async fn radio_config(
     Ok(HttpResponse::Ok().body(format!("Edited {id} with {}", config.title)))
 }
 
+// TODO: Cache playlists
+
 #[routes]
 #[get("/{radio}/listen/master.m3u8")]
 async fn hls_master(
@@ -152,17 +154,23 @@ async fn hls_master(
             .read()
             .await
             .playlist
-            .format_master(&format!("/{id}/listen/"), BANDWIDTHS),
+            .format_master(&format!("/{id}/listen/"), &BANDWIDTHS),
     ))
 }
 
 #[routes]
 #[get("/{radio}/listen/{bandwidth}.m3u8")]
 async fn hls_media(
-    path: web::Path<String>,
+    path: web::Path<(String, String)>,
     state: web::Data<Arc<AppState>>,
 ) -> Result<HttpResponse, PageError> {
-    let id = path.into_inner();
+    let (id, band) = path.into_inner();
+    let band: usize = band.parse().map_err(|_| PageError::NotFound)?;
+    let i = BANDWIDTHS
+        .iter()
+        .enumerate()
+        .find_map(|(i, b)| if b == &band { Some(i) } else { None })
+        .ok_or(PageError::NotFound)?;
 
     Ok(HttpResponse::Ok().body(
         state
@@ -174,7 +182,7 @@ async fn hls_media(
             .read()
             .await
             .playlist
-            .format_media()[0] // TODO: get data of bandwidth (probably refactor format_media)
+            .format_media()[i] // TODO: get data of bandwidth in a more efficient way (probably refactor format_media)
             .clone(),
     ))
 }
@@ -226,7 +234,7 @@ async fn main() -> std::io::Result<()> {
                 title: "Test".to_owned(),
                 description: "This is a test station, \n ignore".to_owned(),
             },
-            playlist: hls::MasterPlaylist::new([]),
+            playlist: hls::MasterPlaylist::new([hls::MediaPlaylist::new([hls::Segment {}])]),
         }),
     );
 

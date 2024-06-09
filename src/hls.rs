@@ -19,10 +19,9 @@ impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
             .zip(segments)
             .for_each(|(playlist, segment)| playlist.add_segment(segment));
     }
-    pub fn format_master(&self, base_path: &str, bandwidths: [usize; S]) -> String {
+    pub fn format_master(&self, base_path: &str, bandwidths: &[usize; P]) -> String {
         // TODO: Confirm/Test this
-        let playlist_descrs = (0..P).map(|i| {
-            let bandwidth = bandwidths[i];
+        let playlist_descrs = bandwidths.iter().map(|bandwidth| {
             format!(
                 "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"{bandwidth}\",NAME=\"{bandwidth}\",AUTOSELECT=YES,DEFAULT=YES
             #EXT-X-STREAM-INF:BANDWIDTH={bandwidth},CODECS=\"mp3\"
