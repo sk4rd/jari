@@ -156,6 +156,29 @@ async fn hls_master(
     ))
 }
 
+#[routes]
+#[get("/{radio}/listen/{bandwidth}.m3u8")]
+async fn hls_media(
+    path: web::Path<String>,
+    state: web::Data<Arc<AppState>>,
+) -> Result<HttpResponse, PageError> {
+    let id = path.into_inner();
+
+    Ok(HttpResponse::Ok().body(
+        state
+            .radio_states
+            .read()
+            .await
+            .get(&id)
+            .ok_or(PageError::NotFound)?
+            .read()
+            .await
+            .playlist
+            .format_media()[0] // TODO: get data of bandwidth (probably refactor format_media)
+            .clone(),
+    ))
+}
+
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let args = Args::parse();
