@@ -42,6 +42,22 @@ impl ResponseError for PageError {
     }
 }
 
+const NUM_BANDWIDTHS: usize = 1;
+const NUM_SEGMENTS: usize = 0;
+
+const BANDWIDTHS: [usize; NUM_BANDWIDTHS] = [22000];
+/// Radio Config sent by the frontend
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct Config {
+    title: String,
+    description: String,
+}
+/// Data for the radios
+#[derive(Debug, Clone)]
+struct RadioState {
+    config: Config,
+    playlist: hls::MasterPlaylist<NUM_SEGMENTS, NUM_BANDWIDTHS>,
+}
 /// Global async app state
 struct AppState {
     pages: (&'static str, &'static str, &'static str),
@@ -61,23 +77,6 @@ async fn start_page() -> impl Responder {
 #[get("/auth/")]
 async fn auth_page() -> impl Responder {
     HttpResponse::Ok()
-}
-
-const NUM_BANDWIDTHS: usize = 1;
-const NUM_SEGMENTS: usize = 0;
-
-const BANDWIDTHS: [usize; NUM_BANDWIDTHS] = [22000];
-/// Radio Config sent by the frontend
-#[derive(Debug, Clone, Deserialize, Serialize)]
-struct Config {
-    title: String,
-    description: String,
-}
-/// Data for the radios
-#[derive(Debug, Clone)]
-struct RadioState {
-    config: Config,
-    playlist: hls::MasterPlaylist<NUM_SEGMENTS, NUM_BANDWIDTHS>,
 }
 
 #[routes]
