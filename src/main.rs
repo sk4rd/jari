@@ -243,6 +243,8 @@ async fn main() -> std::io::Result<()> {
                 .service(auth_page)
                 .service(radio_page)
                 .service(radio_edit)
+                .service(hls_master)
+                .service(hls_media)
         })
         .bind(("0.0.0.0", port))?
         .run()
