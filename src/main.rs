@@ -135,6 +135,28 @@ async fn radio_config(
     Ok(HttpResponse::Ok().body(format!("Edited {id} with {}", config.title)))
 }
 
+#[routes]
+#[get("/{radio}/listen/master.m3u8")]
+async fn hls_master(
+    path: web::Path<String>,
+    state: web::Data<Arc<AppState>>,
+) -> Result<HttpResponse, PageError> {
+    let id = path.into_inner();
+
+    Ok(HttpResponse::Ok().body(
+        state
+            .radio_states
+            .read()
+            .await
+            .get(&id)
+            .ok_or(PageError::NotFound)?
+            .read()
+            .await
+            .playlist
+            .format_master(&format!("/{id}/listen/"), BANDWIDTHS),
+    ))
+}
+
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let args = Args::parse();
