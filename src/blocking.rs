@@ -8,7 +8,7 @@ use crate::hls::Segment;
 pub enum ToBlocking {}
 /// The blocking thread, contains mainly audio processing
 pub fn main<const S: usize>(
-    _atx: tokio::sync::mpsc::UnboundedSender<(Instant, Vec<[Segment; S]>)>,
+    _atx: tokio::sync::mpsc::UnboundedSender<(Instant, Vec<(String, [Segment; S])>)>,
     mut srx: tokio::sync::mpsc::UnboundedReceiver<ToBlocking>,
     interval: Duration,
 ) {

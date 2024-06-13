@@ -239,7 +239,7 @@ async fn main() -> std::io::Result<()> {
     );
 
     // Start blocking thread
-    std::thread::spawn(|| blocking::main::<NUM_BANDWIDTHS>(atx, srx, Duration::from_secs(10)));
+    std::thread::spawn(|| blocking::main(atx, srx, Duration::from_secs(10)));
 
     // Start web server task
     let server = {
@@ -263,7 +263,7 @@ async fn main() -> std::io::Result<()> {
         let data = data.clone();
         tokio::task::spawn(
             UnboundedReceiverStream::new(arx)
-                .then(move |frame| hls::update(frame, data.clone()))
+                .then(move |frame| hls::update(frame.0, frame.1, data.clone()))
                 .collect::<()>(),
         )
     };

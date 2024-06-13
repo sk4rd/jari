@@ -117,7 +117,19 @@ impl<const S: usize> MediaPlaylist<S> {
 pub struct Segment {}
 
 /// Function to add the new segments and set the new current segment
-pub async fn update<const S: usize>(_instant: (Instant, Vec<[Segment; S]>), _data: Arc<AppState>) {
+pub async fn update(
+    instant: Instant,
+    audio: Vec<(String, [Segment; crate::NUM_BANDWIDTHS])>,
+    data: Arc<AppState>,
+) {
     // TODO: Update the HLS data on to instant
-    println!("{}µs", _instant.0.elapsed().as_micros())
+    for (id, segments) in audio {
+        let radio_states = data.radio_states.read().await;
+        let Some(state) = radio_states.get(&id) else {
+            eprintln!("Mismatched State! {id} was sent by blocking, but is not in appstate");
+            continue;
+        };
+        state.write().await.playlist.add_segments(segments);
+    }
+    println!("{}µs", instant.elapsed().as_micros())
 }
