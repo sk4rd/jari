@@ -159,7 +159,7 @@ async fn hls_master(
 }
 
 #[routes]
-#[get("/{radio}/listen/{bandwidth}.m3u8")]
+#[get("/{radio}/listen/{bandwidth}/playlist.m3u8")]
 async fn hls_media(
     path: web::Path<(String, String)>,
     state: web::Data<Arc<AppState>>,
