@@ -24,13 +24,13 @@ impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
         let playlist_descrs = bandwidths.iter().map(|bandwidth| {
             format!(
                 "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"{bandwidth}\",NAME=\"{bandwidth}\",AUTOSELECT=YES,DEFAULT=YES
-            #EXT-X-STREAM-INF:BANDWIDTH={bandwidth},CODECS=\"mp3\"
-            {base_path}/{bandwidth}/playlist.m3u8"
+#EXT-X-STREAM-INF:BANDWIDTH={bandwidth},CODECS=\"mp3\"
+{base_path}{bandwidth}/playlist.m3u8"
             )
         });
         format!(
             "#EXTM3U
-            {}",
+{}",
             playlist_descrs
                 .reduce(|a, e| format!("{a}\n{e}"))
                 .unwrap_or(String::new())
@@ -53,6 +53,9 @@ pub struct MediaPlaylist<const S: usize> {
 }
 
 impl<const S: usize> MediaPlaylist<S> {
+    const _TESTS: () = {
+        assert!(S > 0);
+    };
     pub const fn new(segments: [Segment; S]) -> Self {
         Self {
             current_index: S - 1,
@@ -70,21 +73,25 @@ impl<const S: usize> MediaPlaylist<S> {
     }
     pub fn format(&self) -> String {
         // TODO: Confirm/Test this
-        let start = self.current - S;
+        let start = if self.current >= S {
+            self.current - S
+        } else {
+            0
+        };
         let segment_descrs = (0..S).map(|i| {
             format!(
-                "#EXTINF:10.000
-            {i}.acc"
+                "#EXTINF:10.000,
+{i}.acc"
             )
         });
         format!(
             "#EXTM3U
-            #EXT-X-VERSION:3
-            #EXT-X-TARGETDURATION:10
-            #ID3-EQUIV-TDTG:2023-10-02T03:18:35
-            #EXT-X-PLAYLIST-TYPE:EVENT
-            #EXT-X-MEDIA-SEQUENCE:{start}
-            {}",
+#EXT-X-VERSION:3
+#EXT-X-TARGETDURATION:10
+#ID3-EQUIV-TDTG:2023-10-02T03:18:35
+#EXT-X-PLAYLIST-TYPE:EVENT
+#EXT-X-MEDIA-SEQUENCE:{start}
+{}",
             segment_descrs
                 .reduce(|a, e| format!("{a}\n{e}"))
                 .unwrap_or(String::new())
