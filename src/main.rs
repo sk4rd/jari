@@ -65,6 +65,7 @@ struct AppState {
     radio_states: RwLock<HashMap<String, RwLock<RadioState>>>,
 }
 
+/// TO MIKO: this is unformatted (for now) pages.0
 #[routes]
 #[get("/")]
 #[get("/index.html")]
@@ -79,6 +80,7 @@ async fn auth_page() -> impl Responder {
     HttpResponse::Ok()
 }
 
+/// TO MIKO: this is formatted pages.1 (replace {name}, {title}, {description})
 #[routes]
 #[get("/{radio}")]
 #[get("/{radio}/")]
@@ -87,22 +89,23 @@ async fn radio_page(
     path: web::Path<String>,
     state: web::Data<Arc<AppState>>,
 ) -> Result<HttpResponse, PageError> {
-    let id = path.into_inner();
+    let name = path.into_inner();
     // Extract Radio State
     let Config { title, description } = state
         .radio_states
         .read()
         .await
-        .get(&id)
+        .get(&name)
         .ok_or(PageError::NotFound)?
         .read()
         .await
         .config
         .clone();
     // Return formatted data
-    Ok(HttpResponse::Ok().body(format!("Radio {title} ({id})\n {description}")))
+    Ok(HttpResponse::Ok().body(format!("Radio {title} ({name})\n {description}")))
 }
 
+/// TO MIKO: this is formatted pages.2 replace
 #[routes]
 #[get("/{radio}/edit")]
 #[get("/{radio}/edit/")]
@@ -251,6 +254,7 @@ async fn main() -> std::io::Result<()> {
                 .service(auth_page)
                 .service(radio_page)
                 .service(radio_edit)
+                .service(radio_config)
                 .service(hls_master)
                 .service(hls_media)
         })
