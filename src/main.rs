@@ -80,7 +80,6 @@ async fn auth_page() -> impl Responder {
     HttpResponse::Ok()
 }
 
-/// TO MIKO: this is formatted pages.1 (replace {name}, {title}, {description})
 #[routes]
 #[get("/{radio}")]
 #[get("/{radio}/")]
@@ -102,17 +101,43 @@ async fn radio_page(
         .config
         .clone();
     // Return formatted data
-    Ok(HttpResponse::Ok().body(format!("Radio {title} ({name})\n {description}")))
+    Ok(HttpResponse::Ok().body(
+        state
+            .pages
+            .1
+            .replace("{title}", &title)
+            .replace("{name}", &name)
+            .replace("{description}", &description),
+    ))
 }
 
-/// TO MIKO: this is formatted pages.2 replace
 #[routes]
 #[get("/{radio}/edit")]
 #[get("/{radio}/edit/")]
 #[get("/{radio}/edit/index.html")]
-async fn radio_edit(path: web::Path<String>) -> impl Responder {
+async fn radio_edit(
+    path: web::Path<String>,
+    state: web::Data<Arc<AppState>>,
+) -> Result<HttpResponse, PageError> {
     let id = path.into_inner();
-    HttpResponse::Ok().body(format!("Edit {id}"))
+    let Config { title, description } = state
+        .radio_states
+        .read()
+        .await
+        .get(&id)
+        .ok_or(PageError::NotFound)?
+        .read()
+        .await
+        .config
+        .clone();
+    Ok(HttpResponse::Ok().body(
+        state
+            .pages
+            .2
+            .replace("{title}", &title)
+            .replace("{id}", &id)
+            .replace("{description}", &description),
+    ))
 }
 
 #[routes]
