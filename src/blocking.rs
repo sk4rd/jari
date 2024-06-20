@@ -5,7 +5,21 @@ use tokio::time::Instant;
 use crate::hls::Segment;
 
 /// Messages, that can be sent to the blocking thread (mainly audio)
-pub enum ToBlocking {}
+#[derive(Debug, Clone)]
+pub enum ToBlocking {
+    /// Upload a song to segment and save (given a song id)
+    Upload {
+        radio: String,
+        song: u8,
+        data: Box<[u8]>,
+    },
+    /// Set a playlist order (order of song ids)
+    Order { radio: String, order: Vec<u8> },
+    /// Remove a song
+    Remove { radio: String, song: u8 },
+    /// Remove a radio
+    RemoveRadio { radio: String },
+}
 /// The blocking thread, contains mainly audio processing
 pub fn main<const S: usize>(
     _atx: tokio::sync::mpsc::UnboundedSender<(Instant, Vec<(String, [Segment; S])>)>,
@@ -16,7 +30,12 @@ pub fn main<const S: usize>(
     loop {
         // Check for messages
         match srx.try_recv() {
-            Ok(msg) => match msg {},
+            Ok(msg) => match msg {
+                // TODO(audio): handle messages
+                _ => {
+                    println!("{msg:?}");
+                }
+            },
             Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {}
             Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return,
         }
