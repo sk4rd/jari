@@ -50,8 +50,13 @@ impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
         }
         out
     }
+    /// Format the ith media playlist
     pub fn format_media(&self, i: usize) -> Option<String> {
         Some(self.playlists.get(i)?.format())
+    }
+    /// Get a segment from media playlist
+    pub fn get_segment(&self, playlist: usize, segment: usize) -> Option<Segment> {
+        self.playlists.get(playlist)?.get_segment(segment)
     }
 }
 
@@ -84,7 +89,23 @@ impl<const S: usize> MediaPlaylist<S> {
         } else {
             0
         };
+        self.current += 1;
         self.segments[i] = segment;
+    }
+    /// Get the ith segment
+    pub fn get_segment(&self, i: usize) -> Option<Segment> {
+        let index = self.current.checked_sub(i)?;
+        if index > S {
+            return None;
+        };
+        Some(
+            self.segments[if self.current_index > index {
+                self.current_index - index
+            } else {
+                self.current_index + S - index
+            }]
+            .clone(),
+        )
     }
     /// Produce a formatted m3u8 String for the media playlist
     pub fn format(&self) -> String {
