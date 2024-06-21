@@ -189,11 +189,10 @@ async fn hls_master(
 #[routes]
 #[get("/{radio}/listen/{bandwidth}/playlist.m3u8")]
 async fn hls_media(
-    path: web::Path<(String, String)>,
+    path: web::Path<(String, usize)>,
     state: web::Data<Arc<AppState>>,
 ) -> Result<HttpResponse, PageError> {
     let (id, band) = path.into_inner();
-    let band: usize = band.parse().map_err(|_| PageError::NotFound)?;
     let i = BANDWIDTHS
         .iter()
         .enumerate()
@@ -218,7 +217,7 @@ async fn hls_media(
 #[routes]
 #[get("/{radio}/listen/{bandwidth}/{segment}.acc")]
 async fn hls_segment(
-    path: web::Path<(String, usize, u8)>,
+    path: web::Path<(String, usize, usize)>,
     state: web::Data<Arc<AppState>>,
 ) -> Result<HttpResponse, PageError> {
     let (id, band, seg) = path.into_inner();
