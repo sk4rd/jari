@@ -215,6 +215,18 @@ async fn hls_media(
     ))
 }
 
+#[routes]
+#[get("/{radio}/listen/{bandwidth}/{segment}.acc")]
+async fn hls_segment(
+    path: web::Path<(String, usize, u8)>,
+    state: web::Data<Arc<AppState>>,
+) -> Result<HttpResponse, PageError> {
+    let (id, band, seg) = path.into_inner();
+    Ok(
+        HttpResponse::Ok().body(todo!()/*state.radio_states.read().await.get(&id).ok_or(PageError::NotFound)?.read().await.playlist*/),
+    )
+}
+
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let args = Args::parse();
@@ -282,6 +294,7 @@ async fn main() -> std::io::Result<()> {
                 .service(radio_config)
                 .service(hls_master)
                 .service(hls_media)
+                .service(hls_segment)
                 .service(Files::new("/reserved", "./resources").prefer_utf8(true))
         })
         .bind(("0.0.0.0", port))?
