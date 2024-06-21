@@ -1,3 +1,4 @@
+use actix_files::Files;
 use actix_web::{
     error::ResponseError, get, http::StatusCode, routes, web, App, HttpResponse, HttpServer,
     Responder,
@@ -65,12 +66,11 @@ struct AppState {
     radio_states: RwLock<HashMap<String, RwLock<RadioState>>>,
 }
 
-/// TO MIKO: this is unformatted (for now) pages.0
 #[routes]
 #[get("/")]
 #[get("/index.html")]
-async fn start_page() -> impl Responder {
-    HttpResponse::Ok().body("Start")
+async fn start_page(state: web::Data<Arc<AppState>>) -> impl Responder {
+    HttpResponse::Ok().body(state.pages.0)
 }
 
 #[routes]
@@ -282,6 +282,7 @@ async fn main() -> std::io::Result<()> {
                 .service(radio_config)
                 .service(hls_master)
                 .service(hls_media)
+                .service(Files::new("/reserved", "./resources").prefer_utf8(true))
         })
         .bind(("0.0.0.0", port))?
         .run()
@@ -299,7 +300,7 @@ async fn main() -> std::io::Result<()> {
     // Run all tasks (until one finishes)
     // NOTE: Only use Futures that only finish on unrecoverable errors (but we still want to exit gracefully)
     select! {
-        x = server => return x,
-        _ = hls => unreachable!()
+    x = server => return x,
+    _ = hls => unreachable!()
     }
 }
