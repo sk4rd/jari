@@ -19,6 +19,8 @@ pub enum ToBlocking {
     Remove { radio: String, song: u8 },
     /// Remove a radio
     RemoveRadio { radio: String },
+    /// Add a radio
+    AddRadio { radio: String },
 }
 /// The blocking thread, contains mainly audio processing
 pub fn main<const S: usize>(
