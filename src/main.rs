@@ -209,7 +209,8 @@ async fn hls_media(
             .read()
             .await
             .playlist
-            .format_media()[i] // TODO: get data of bandwidth in a more efficient way (probably refactor format_media)
+            .format_media(i)
+            .unwrap() // PANICKING: I is always a bandwidth used
             .clone(),
     ))
 }

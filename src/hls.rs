@@ -43,12 +43,15 @@ impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
         )
     }
     /// Format each of the media playlists
-    pub fn format_media(&self) -> [String; P] {
+    pub fn format_all_media(&self) -> [String; P] {
         let mut out = [""; P].map(|s| s.to_owned());
         for i in 0..P {
             out[i] = self.playlists[i].format();
         }
         out
+    }
+    pub fn format_media(&self, i: usize) -> Option<String> {
+        Some(self.playlists.get(i)?.format())
     }
 }
 
