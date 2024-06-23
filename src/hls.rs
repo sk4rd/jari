@@ -58,6 +58,10 @@ impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
     pub fn get_segment(&self, playlist: usize, segment: usize) -> Option<Segment> {
         self.playlists.get(playlist)?.get_segment(segment)
     }
+    /// Get the raw data of a segment from a media playlist
+    pub fn get_segment_raw(&self, playlist: usize, segment: usize) -> Option<Box<[u8]>> {
+        Some(self.get_segment(playlist, segment)?.get_raw())
+    }
 }
 
 /// The media playlist, normally of a specific bandwidth, contains its segments with indeces
@@ -138,6 +142,12 @@ impl<const S: usize> MediaPlaylist<S> {
 /// A HLS Segment, should contain audio data with header
 #[derive(Debug, Clone)]
 pub struct Segment {}
+
+impl Segment {
+    pub fn get_raw(&self) -> Box<[u8]> {
+        todo!("Add Raw data to segment")
+    }
+}
 
 /// Function to add the new segments and set the new current segment
 pub async fn update(
