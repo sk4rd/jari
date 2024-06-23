@@ -103,7 +103,7 @@ impl<const S: usize> MediaPlaylist<S> {
             return None;
         };
         Some(
-            self.segments[if self.current_index > index {
+            self.segments[if self.current_index >= index {
                 self.current_index - index
             } else {
                 self.current_index + S - index
