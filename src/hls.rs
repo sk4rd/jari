@@ -118,7 +118,7 @@ impl<const S: usize> MediaPlaylist<S> {
         let segment_descrs = (0..S).map(|i| {
             format!(
                 "#EXTINF:10.000,
-{i}.acc"
+{i}.mp3"
             )
         });
         format!(

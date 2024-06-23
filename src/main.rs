@@ -216,7 +216,7 @@ async fn hls_media(
 }
 
 #[routes]
-#[get("/{radio}/listen/{bandwidth}/{segment}.acc")]
+#[get("/{radio}/listen/{bandwidth}/{segment}.mp3")]
 async fn hls_segment(
     path: web::Path<(String, usize, usize)>,
     state: web::Data<Arc<AppState>>,
