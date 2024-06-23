@@ -222,9 +222,25 @@ async fn hls_segment(
     state: web::Data<Arc<AppState>>,
 ) -> Result<HttpResponse, PageError> {
     let (id, band, seg) = path.into_inner();
-    Ok(
-        HttpResponse::Ok().body(todo!()/*state.radio_states.read().await.get(&id).ok_or(PageError::NotFound)?.read().await.playlist*/),
-    )
+    let i = BANDWIDTHS
+        .iter()
+        .enumerate()
+        .find_map(|(i, b)| if b == &band { Some(i) } else { None })
+        .ok_or(PageError::NotFound)?;
+
+    Ok(HttpResponse::Ok().body(actix_web::web::Bytes::from(
+        state
+            .radio_states
+            .read()
+            .await
+            .get(&id)
+            .ok_or(PageError::NotFound)?
+            .read()
+            .await
+            .playlist
+            .get_segment_raw(i, seg)
+            .ok_or(PageError::NotFound)?,
+    )))
 }
 
 #[tokio::main]
