@@ -56,7 +56,7 @@ impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
     pub fn format_media(&self, i: usize) -> Option<String> {
         Some(self.playlists.get(i)?.format())
     }
-    /// Get the raw data of a segment from a media playlist
+    /// Get the raw data of a segment from a media playlist with tags
     pub fn get_segment_raw(&self, playlist: usize, segment: usize) -> Option<Box<[u8]>> {
         self.playlists.get(playlist)?.get_segment_raw(segment)
     }
@@ -94,7 +94,7 @@ impl<const S: usize> MediaPlaylist<S> {
         self.current += 1;
         self.segments[i] = segment;
     }
-    /// Get the ith segment
+    /// Get the ith segment processed with tags
     pub fn get_segment_raw(&self, i: usize) -> Option<Box<[u8]>> {
         let index = self.current.checked_sub(i)?;
         if index > S {
@@ -119,7 +119,7 @@ impl<const S: usize> MediaPlaylist<S> {
             private_data: time_vec,
         });
         let mut tag_vec = Vec::new();
-        tag.write_to(&mut tag_vec, id3::Version::Id3v22)
+        tag.write_to(&mut tag_vec, id3::Version::Id3v24)
             .expect("Couldn't write ID3");
         Some(seg.into_boxed_slice())
     }
@@ -153,11 +153,16 @@ impl<const S: usize> MediaPlaylist<S> {
 
 /// A HLS Segment, should contain audio data with header
 #[derive(Debug, Clone)]
-pub struct Segment {}
+pub struct Segment {
+    raw: Box<[u8]>,
+}
 
 impl Segment {
     pub fn get_raw(&self) -> Box<[u8]> {
-        todo!("Add Raw data to segment")
+        self.raw.clone()
+    }
+    pub const fn new(raw: Box<[u8]>) -> Self {
+        Self { raw }
     }
 }
 
