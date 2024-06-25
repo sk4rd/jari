@@ -127,11 +127,11 @@ impl<const S: usize> MediaPlaylist<S> {
     pub fn format(&self) -> String {
         // TODO: Confirm/Test this
         let start = if self.current >= S {
-            self.current - S
+            self.current - S + 1
         } else {
             0
         };
-        let segment_descrs = (0..S).map(|i| {
+        let segment_descrs = (start..=self.current).map(|i| {
             format!(
                 "#EXTINF:10.000,
 {i}.mp3"

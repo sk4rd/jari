@@ -23,12 +23,16 @@ pub enum ToBlocking {
     AddRadio { radio: String },
 }
 /// The blocking thread, contains mainly audio processing
-pub fn main<const S: usize>(
-    _atx: tokio::sync::mpsc::UnboundedSender<(Instant, Vec<(String, [Segment; S])>)>,
+pub fn main(
+    _atx: tokio::sync::mpsc::UnboundedSender<(
+        Instant,
+        Vec<(String, [Segment; crate::NUM_BANDWIDTHS])>,
+    )>,
     mut srx: tokio::sync::mpsc::UnboundedReceiver<ToBlocking>,
     interval: Duration,
 ) {
     let mut last = std::time::Instant::now();
+    let seg = Segment::new(Box::new(include_bytes!("segment2.mp3").clone()));
     loop {
         // Check for messages
         match srx.try_recv() {
@@ -46,7 +50,11 @@ pub fn main<const S: usize>(
         if diff > interval {
             // TODO: send/create next fragment
             last += interval;
-            _atx.send((last.clone().into(), vec![])).unwrap();
+            _atx.send((
+                last.clone().into(),
+                vec![("test".to_string(), [seg.clone()])],
+            ))
+            .unwrap();
         }
     }
 }
