@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use byteorder::WriteBytesExt;
+use id3::TagLike;
 use tokio::time::Instant;
 
 use crate::AppState;
@@ -54,13 +56,9 @@ impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
     pub fn format_media(&self, i: usize) -> Option<String> {
         Some(self.playlists.get(i)?.format())
     }
-    /// Get a segment from media playlist
-    pub fn get_segment(&self, playlist: usize, segment: usize) -> Option<Segment> {
-        self.playlists.get(playlist)?.get_segment(segment)
-    }
     /// Get the raw data of a segment from a media playlist
     pub fn get_segment_raw(&self, playlist: usize, segment: usize) -> Option<Box<[u8]>> {
-        Some(self.get_segment(playlist, segment)?.get_raw())
+        self.playlists.get(playlist)?.get_segment_raw(segment)
     }
 }
 
@@ -97,19 +95,33 @@ impl<const S: usize> MediaPlaylist<S> {
         self.segments[i] = segment;
     }
     /// Get the ith segment
-    pub fn get_segment(&self, i: usize) -> Option<Segment> {
+    pub fn get_segment_raw(&self, i: usize) -> Option<Box<[u8]>> {
         let index = self.current.checked_sub(i)?;
         if index > S {
             return None;
         };
-        Some(
-            self.segments[if self.current_index >= index {
-                self.current_index - index
-            } else {
-                self.current_index + S - index
-            }]
-            .clone(),
-        )
+        let seg = self.segments[if self.current_index >= index {
+            self.current_index - index
+        } else {
+            self.current_index + S - index
+        }]
+        .get_raw()
+        .into_vec();
+
+        let timestamp = (i as u64) * 900000 * 10 * (1 + S as u64);
+        let mut time_vec = Vec::new();
+        time_vec
+            .write_u64::<byteorder::BigEndian>(timestamp)
+            .unwrap();
+        let mut tag = id3::Tag::new();
+        tag.add_frame(id3::frame::Private {
+            owner_identifier: String::from("com.apple.streaming.transportStreamTimestamp"),
+            private_data: time_vec,
+        });
+        let mut tag_vec = Vec::new();
+        tag.write_to(&mut tag_vec, id3::Version::Id3v22)
+            .expect("Couldn't write ID3");
+        Some(seg.into_boxed_slice())
     }
     /// Produce a formatted m3u8 String for the media playlist
     pub fn format(&self) -> String {
