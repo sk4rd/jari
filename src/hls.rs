@@ -100,7 +100,7 @@ impl<const S: usize> MediaPlaylist<S> {
         if index > S {
             return None;
         };
-        let seg = self.segments[if self.current_index >= index {
+        let mut seg = self.segments[if self.current_index >= index {
             self.current_index - index
         } else {
             self.current_index + S - index
@@ -121,7 +121,8 @@ impl<const S: usize> MediaPlaylist<S> {
         let mut tag_vec = Vec::new();
         tag.write_to(&mut tag_vec, id3::Version::Id3v24)
             .expect("Couldn't write ID3");
-        Some(seg.into_boxed_slice())
+        tag_vec.append(&mut seg);
+        Some(tag_vec.into_boxed_slice())
     }
     /// Produce a formatted m3u8 String for the media playlist
     pub fn format(&self) -> String {
