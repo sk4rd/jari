@@ -14,7 +14,7 @@ use tokio::{
     sync::{mpsc::unbounded_channel, RwLock},
     time::Duration,
 };
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio_stream::{wrappers::UnboundedReceiverStream, Timeout};
 
 mod blocking;
 use blocking::ToBlocking;
@@ -52,6 +52,11 @@ const BANDWIDTHS: [usize; NUM_BANDWIDTHS] = [22000];
 struct Config {
     title: String,
     description: String,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct PartialConfig {
+    title: Option<String>,
+    description: Option<String>,
 }
 /// Data for the radios
 #[derive(Debug, Clone)]
@@ -145,21 +150,35 @@ async fn radio_edit(
 #[post("/{radio}/")]
 async fn radio_config(
     path: web::Path<String>,
-    web::Json(config): web::Json<Config>,
+    web::Json(partial_config): web::Json<PartialConfig>,
     state: web::Data<Arc<AppState>>,
 ) -> Result<HttpResponse, PageError> {
     let id = path.into_inner();
-    // Change or add Radio by inserting into HashMap
-    state
-        .radio_states
-        .read()
-        .await
-        .get(&id)
-        .ok_or(PageError::NotFound)?
-        .write()
-        .await
-        .config = config.clone();
-    Ok(HttpResponse::Ok().body(format!("Edited {id} with {}", config.title)))
+    let mut radio_states = state.radio_states.write().await;
+    let radio_state = radio_states.entry(id.clone()).or_insert_with(|| {
+        RwLock::new(RadioState {
+            config: Config {
+                title: "Default Title".to_string(),
+                description: "Default description".to_string(),
+            },
+            playlist: hls::MasterPlaylist::new([hls::MediaPlaylist::new([hls::Segment::new(
+                Box::new(include_bytes!("segment.mp3").clone()),
+            )])]),
+        })
+    });
+
+    let mut radio_state_locked = radio_state.write().await;
+    if let Some(title) = &partial_config.title {
+        radio_state_locked.config.title = title.clone();
+    }
+    if let Some(description) = &partial_config.description {
+        radio_state_locked.config.description = description.clone();
+    }
+
+    Ok(HttpResponse::Ok().body(format!(
+        "Edited {id} with title: {}",
+        radio_state_locked.config.title
+    )))
 }
 
 // TODO: Cache playlists
