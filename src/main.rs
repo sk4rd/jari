@@ -1,7 +1,11 @@
 use actix_files::Files;
 use actix_web::{
-    error::ResponseError, get, http::StatusCode, routes, web, App, HttpResponse, HttpServer,
-    Responder,
+    error::ResponseError,
+    get,
+    http::StatusCode,
+    put, routes,
+    web::{self, Form},
+    App, HttpResponse, HttpServer, Responder,
 };
 use clap::Parser;
 use derive_more::{Display, Error};
@@ -33,13 +37,22 @@ struct Args {
 enum PageError {
     #[display(fmt = "Couldn't find Page")]
     NotFound,
+    #[display(fmt = "Internal server error")]
+    InternalError,
 }
 
 impl ResponseError for PageError {
     fn status_code(&self) -> StatusCode {
         match self {
             Self::NotFound => StatusCode::NOT_FOUND,
+            PageError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
         }
+    }
+}
+
+impl From<tokio::sync::mpsc::error::SendError<ToBlocking>> for PageError {
+    fn from(_: tokio::sync::mpsc::error::SendError<ToBlocking>) -> Self {
+        PageError::InternalError
     }
 }
 
@@ -179,6 +192,35 @@ async fn radio_config(
         "Edited {id} with title: {}",
         radio_state_locked.config.title
     )))
+}
+
+#[put("/{radio}")]
+async fn add_radio(
+    path: web::Path<String>,
+    web::Json(config): web::Json<Config>,
+    state: web::Data<Arc<AppState>>,
+) -> Result<HttpResponse, PageError> {
+    let id = path.into_inner();
+    let mut radio_states = state.radio_states.write().await;
+
+    if radio_states.contains_key(&id) {
+        return Err(PageError::NotFound.into());
+    }
+
+    let new_radio_state = RadioState {
+        config,
+        playlist: hls::MasterPlaylist::new([hls::MediaPlaylist::new([hls::Segment::new(
+            Box::new(include_bytes!("segment.mp3").clone()),
+        )])]),
+    };
+
+    radio_states.insert(id.clone(), RwLock::new(new_radio_state));
+    state
+        .to_blocking
+        .send(ToBlocking::AddRadio { radio: id.clone() })
+        .map_err(PageError::from)?;
+
+    Ok(HttpResponse::Created().body(format!("Radio added with ID: {}", id)))
 }
 
 // TODO: Cache playlists
@@ -330,6 +372,7 @@ async fn main() -> std::io::Result<()> {
                 .service(radio_page)
                 .service(radio_edit)
                 .service(radio_config)
+                .service(add_radio)
                 .service(hls_master)
                 .service(hls_media)
                 .service(hls_segment)
