@@ -7,10 +7,40 @@
             window.location.href = 'start.html'; // Redirect to Startpage
         }
     </script>
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background-color: #f4f4f4;
+            border-bottom: 1px solid #ccc;
+        }
+        .header .title {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .header button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .content {
+            padding: 20px;
+        }
+    </style>
+
 </head>
 <body>
-    <header>
-        <h1>Login</h1>
+    <header class="header" style="background-color: rgb(100, 99, 99);">
+        <div class="title">JARI</div>
+        <button onclick="window.location.href='login.html'">Go to Login</button>
     </header>
     <main>
         <section id="login">
