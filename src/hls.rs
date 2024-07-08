@@ -74,7 +74,7 @@ pub struct MediaPlaylist<const S: usize> {
 impl<const S: usize> MediaPlaylist<S> {
     /// Check the compiletime requirements (S > 0)
     const _TESTS: () = {
-        assert!(S > 0);
+        assert!(S > 1);
     };
     /// Create a MediaPlaylist from its Segments
     pub const fn new(segments: [Segment; S]) -> Self {
@@ -127,11 +127,7 @@ impl<const S: usize> MediaPlaylist<S> {
     /// Produce a formatted m3u8 String for the media playlist
     pub fn format(&self) -> String {
         // TODO: Confirm/Test this
-        let start = if self.current >= S {
-            self.current - S + 1
-        } else {
-            0
-        };
+        let start = self.current.saturating_sub(S - 2);
         let segment_descrs = (start..=self.current).map(|i| {
             format!(
                 "#EXTINF:10.000,

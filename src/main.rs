@@ -1,8 +1,10 @@
 use actix_files::Files;
 use actix_web::{
+    delete,
     error::ResponseError,
     get,
-    http::StatusCode,
+    http::{header::Expires, StatusCode},
+    middleware::Compress,
     put, routes,
     web::{self, Form},
     App, HttpResponse, HttpServer, Responder,
@@ -11,7 +13,7 @@ use clap::Parser;
 use derive_more::{Display, Error};
 use futures::{future::join_all, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, time::SystemTime};
 use tokio::{
     fs::read_to_string,
     select,
@@ -57,7 +59,7 @@ impl From<tokio::sync::mpsc::error::SendError<ToBlocking>> for PageError {
 }
 
 const NUM_BANDWIDTHS: usize = 1;
-const NUM_SEGMENTS: usize = 1;
+const NUM_SEGMENTS: usize = 2;
 
 const BANDWIDTHS: [usize; NUM_BANDWIDTHS] = [22000];
 /// Radio Config sent by the frontend
@@ -167,18 +169,8 @@ async fn radio_config(
     state: web::Data<Arc<AppState>>,
 ) -> Result<HttpResponse, PageError> {
     let id = path.into_inner();
-    let mut radio_states = state.radio_states.write().await;
-    let radio_state = radio_states.entry(id.clone()).or_insert_with(|| {
-        RwLock::new(RadioState {
-            config: Config {
-                title: "Default Title".to_string(),
-                description: "Default description".to_string(),
-            },
-            playlist: hls::MasterPlaylist::new([hls::MediaPlaylist::new([hls::Segment::new(
-                Box::new(include_bytes!("segment.mp3").clone()),
-            )])]),
-        })
-    });
+    let radio_states = state.radio_states.write().await;
+    let radio_state = radio_states.get(&id).ok_or(PageError::NotFound)?;
 
     let mut radio_state_locked = radio_state.write().await;
     if let Some(title) = &partial_config.title {
@@ -209,9 +201,10 @@ async fn add_radio(
 
     let new_radio_state = RadioState {
         config,
-        playlist: hls::MasterPlaylist::new([hls::MediaPlaylist::new([hls::Segment::new(
-            Box::new(include_bytes!("segment.mp3").clone()),
-        )])]),
+        playlist: hls::MasterPlaylist::new([hls::MediaPlaylist::new([
+            hls::Segment::new(Box::new(include_bytes!("segment.mp3").clone())),
+            hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone())),
+        ])]),
     };
 
     radio_states.insert(id.clone(), RwLock::new(new_radio_state));
@@ -221,6 +214,28 @@ async fn add_radio(
         .map_err(PageError::from)?;
 
     Ok(HttpResponse::Created().body(format!("Radio added with ID: {}", id)))
+}
+
+#[delete("/{radio}")]
+async fn remove_radio(
+    path: web::Path<String>,
+    state: web::Data<Arc<AppState>>,
+) -> Result<HttpResponse, PageError> {
+    let id = path.into_inner();
+    let mut radio_states = state.radio_states.write().await;
+
+    // Throw NotFound if page with id was not found
+    if !radio_states.contains_key(&id) {
+        return Err(PageError::NotFound.into());
+    }
+
+    radio_states.remove(&id);
+    state
+        .to_blocking
+        .send(ToBlocking::RemoveRadio { radio: id.clone() })
+        .map_err(PageError::from)?;
+
+    Ok(HttpResponse::Ok().body(format!("Radio with ID {} has been removed", id)))
 }
 
 // TODO: Cache playlists
@@ -233,18 +248,20 @@ async fn hls_master(
 ) -> Result<HttpResponse, PageError> {
     let id = path.into_inner();
 
-    Ok(HttpResponse::Ok().body(
-        state
-            .radio_states
-            .read()
-            .await
-            .get(&id)
-            .ok_or(PageError::NotFound)?
-            .read()
-            .await
-            .playlist
-            .format_master(&format!("/{id}/listen/"), &BANDWIDTHS),
-    ))
+    Ok(HttpResponse::Ok()
+        .insert_header(("Content-Type", "audio/mpegurl"))
+        .body(
+            state
+                .radio_states
+                .read()
+                .await
+                .get(&id)
+                .ok_or(PageError::NotFound)?
+                .read()
+                .await
+                .playlist
+                .format_master(&format!("/{id}/listen/"), &BANDWIDTHS),
+        ))
 }
 
 #[routes]
@@ -260,20 +277,22 @@ async fn hls_media(
         .find_map(|(i, b)| if b == &band { Some(i) } else { None })
         .ok_or(PageError::NotFound)?;
 
-    Ok(HttpResponse::Ok().body(
-        state
-            .radio_states
-            .read()
-            .await
-            .get(&id)
-            .ok_or(PageError::NotFound)?
-            .read()
-            .await
-            .playlist
-            .format_media(i)
-            .unwrap() // PANICKING: I is always a bandwidth used
-            .clone(),
-    ))
+    Ok(HttpResponse::Ok()
+        .insert_header(("Content-Type", "audio/mpegurl"))
+        .body(
+            state
+                .radio_states
+                .read()
+                .await
+                .get(&id)
+                .ok_or(PageError::NotFound)?
+                .read()
+                .await
+                .playlist
+                .format_media(i)
+                .unwrap() // PANICKING: I is always a bandwidth used
+                .clone(),
+        ))
 }
 
 #[routes]
@@ -289,19 +308,26 @@ async fn hls_segment(
         .find_map(|(i, b)| if b == &band { Some(i) } else { None })
         .ok_or(PageError::NotFound)?;
 
-    Ok(HttpResponse::Ok().body(actix_web::web::Bytes::from(
-        state
-            .radio_states
-            .read()
-            .await
-            .get(&id)
-            .ok_or(PageError::NotFound)?
-            .read()
-            .await
-            .playlist
-            .get_segment_raw(i, seg)
-            .ok_or(PageError::NotFound)?,
-    )))
+    Ok(HttpResponse::Ok()
+        .insert_header(Expires(
+            SystemTime::now()
+                .checked_sub(Duration::from_secs(10))
+                .ok_or(PageError::InternalError)?
+                .into(),
+        ))
+        .body(actix_web::web::Bytes::from(
+            state
+                .radio_states
+                .read()
+                .await
+                .get(&id)
+                .ok_or(PageError::NotFound)?
+                .read()
+                .await
+                .playlist
+                .get_segment_raw(i, seg)
+                .ok_or(PageError::NotFound)?,
+        )))
 }
 
 #[tokio::main]
@@ -351,10 +377,13 @@ async fn main() -> std::io::Result<()> {
                 title: "Test".to_owned(),
                 description: "This is a test station, \n ignore".to_owned(),
             },
-            playlist: hls::MasterPlaylist::new([hls::MediaPlaylist::new([hls::Segment::new(
-                // NOTICE: This is a test segment taken from the Public Domain recording of Traditional American blues performed by Al Bernard & The Goofus Five year 1930
-                Box::new(include_bytes!("segment.mp3").clone()),
-            )])]),
+            playlist: hls::MasterPlaylist::new([hls::MediaPlaylist::new([
+                hls::Segment::new(
+                    // NOTICE: This is a test segment taken from the Public Domain recording of Traditional American blues performed by Al Bernard & The Goofus Five year 1930
+                    Box::new(include_bytes!("segment.mp3").clone()),
+                ),
+                hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone())),
+            ])]),
         }),
     );
 
@@ -367,12 +396,14 @@ async fn main() -> std::io::Result<()> {
         HttpServer::new(move || {
             App::new()
                 .app_data(web::Data::new(data.clone()))
+                .wrap(Compress::default())
                 .service(start_page)
                 .service(auth_page)
                 .service(radio_page)
                 .service(radio_edit)
                 .service(radio_config)
                 .service(add_radio)
+                .service(remove_radio)
                 .service(hls_master)
                 .service(hls_media)
                 .service(hls_segment)
