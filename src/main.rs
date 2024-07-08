@@ -307,23 +307,27 @@ async fn hls_segment(
         .enumerate()
         .find_map(|(i, b)| if b == &band { Some(i) } else { None })
         .ok_or(PageError::NotFound)?;
-
+    let radio_states_read = state.radio_states.read().await;
+    let radio_state = radio_states_read
+        .get(&id)
+        .ok_or(PageError::NotFound)?
+        .read()
+        .await;
     Ok(HttpResponse::Ok()
         .insert_header(Expires(
             SystemTime::now()
-                .checked_sub(Duration::from_secs(10))
+                .checked_add(Duration::from_secs(
+                    10 * (radio_state
+                        .playlist
+                        .current()
+                        .checked_sub(seg)
+                        .ok_or(PageError::NotFound)?) as u64 as u64,
+                ))
                 .ok_or(PageError::InternalError)?
                 .into(),
         ))
         .body(actix_web::web::Bytes::from(
-            state
-                .radio_states
-                .read()
-                .await
-                .get(&id)
-                .ok_or(PageError::NotFound)?
-                .read()
-                .await
+            radio_state
                 .playlist
                 .get_segment_raw(i, seg)
                 .ok_or(PageError::NotFound)?,

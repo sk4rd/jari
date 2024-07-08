@@ -13,6 +13,9 @@ pub struct MasterPlaylist<const P: usize, const S: usize> {
 }
 
 impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
+    const _TEST: () = {
+        assert!(P > 0);
+    };
     /// Create a new MasterPlaylist from its MediaPlaylists
     pub const fn new(playlists: [MediaPlaylist<S>; P]) -> Self {
         Self { playlists }
@@ -30,7 +33,7 @@ impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
         // Format the metadata for each playlist/bandwidth
         let playlist_descrs = bandwidths.iter().map(|bandwidth| {
             format!(
-                "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"{bandwidth}\",NAME=\"{bandwidth}\",AUTOSELECT=YES,DEFAULT=YES
+                "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"{bandwidth}\",NAME=\"{bandwidth}\",AUTOSELECT=YES,DEFAULT=YES,AUTOSELECT=YES
 #EXT-X-STREAM-INF:BANDWIDTH={bandwidth},CODECS=\"mp3\"
 {base_path}{bandwidth}/playlist.m3u8"
             )
@@ -59,6 +62,10 @@ impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
     /// Get the raw data of a segment from a media playlist with tags
     pub fn get_segment_raw(&self, playlist: usize, segment: usize) -> Option<Box<[u8]>> {
         self.playlists.get(playlist)?.get_segment_raw(segment)
+    }
+    /// Get the index of the newest segment
+    pub fn current(&self) -> usize {
+        self.playlists[0].current
     }
 }
 
@@ -138,7 +145,6 @@ impl<const S: usize> MediaPlaylist<S> {
             "#EXTM3U
 #EXT-X-VERSION:3
 #EXT-X-TARGETDURATION:10
-#EXT-X-PLAYLIST-TYPE:EVENT
 #EXT-X-MEDIA-SEQUENCE:{start}
 {}",
             segment_descrs
