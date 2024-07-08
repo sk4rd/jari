@@ -3,9 +3,30 @@
   <head>
     <title>{title}</title>
   </head>
-  <body>
+  <body style="background-color: rgb(100, 99, 99);">
     <h1>Radio Page</h1>
     <p>{name}</p>
     <p>{description}</p>
+  
+    <p>
+      <audio controls>
+      </audio>
+    </p>
+   
+    <p> 
+      <button style="background-color: rgb(243, 146, 0);">Button 1</button>
+    </p>
+
+    <p>
+        <section id="search">
+          <h2>Suche</h2>
+          <form action="/search" method="get">
+              <label for="search-input">Suchbegriff:</label>
+              <input type="text" id="search-input" name="q" required>
+              <button type="submit">Suchen</button>
+          </form>
+      </section>
+    </p>
+
   </body>
 </html>
