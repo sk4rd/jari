@@ -218,6 +218,38 @@ async fn add_radio(
     Ok(HttpResponse::Created().body(format!("Radio added with ID: {}", id)))
 }
 
+#[routes]
+#[put("/{radio}/order")]
+#[put("/{radio}/order/")]
+async fn set_order(
+    path: web::Path<String>,
+    payload: web::Json<Vec<String>>,
+    state: web::Data<Arc<AppState>>,
+) -> Result<HttpResponse, PageError> {
+    let radio_id = path.into_inner();
+    let radio_states = state.radio_states.read().await;
+    let radio_state = radio_states
+        .get(&radio_id)
+        .ok_or(PageError::NotFound)?
+        .read()
+        .await;
+
+    state
+        .to_blocking
+        .send(ToBlocking::Order {
+            radio: radio_id.clone(),
+            order: payload
+                .into_inner()
+                .into_iter()
+                .map(|name| radio_state.song_map.get(&name).cloned())
+                .collect::<Option<Vec<u8>>>()
+                .ok_or(PageError::NotFound)?,
+        })
+        .unwrap();
+
+    Ok(HttpResponse::Ok().body(format!("Update song order of radio with ID {}", radio_id)))
+}
+
 #[delete("/{radio}")]
 async fn remove_radio(
     path: web::Path<String>,
@@ -441,6 +473,7 @@ async fn main() -> std::io::Result<()> {
                 .service(radio_edit)
                 .service(radio_config)
                 .service(add_radio)
+                .service(set_order)
                 .service(remove_radio)
                 .service(remove_radio_song)
                 .service(hls_master)
