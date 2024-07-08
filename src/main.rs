@@ -168,7 +168,7 @@ async fn radio_config(
     state: web::Data<Arc<AppState>>,
 ) -> Result<HttpResponse, PageError> {
     let id = path.into_inner();
-    let mut radio_states = state.radio_states.write().await;
+    let radio_states = state.radio_states.write().await;
     let radio_state = radio_states.get(&id).ok_or(PageError::NotFound)?;
 
     let mut radio_state_locked = radio_state.write().await;
