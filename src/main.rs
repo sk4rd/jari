@@ -4,6 +4,7 @@ use actix_web::{
     error::ResponseError,
     get,
     http::{header::Expires, StatusCode},
+    middleware::Compress,
     put, routes,
     web::{self, Form},
     App, HttpResponse, HttpServer, Responder,
@@ -395,6 +396,7 @@ async fn main() -> std::io::Result<()> {
         HttpServer::new(move || {
             App::new()
                 .app_data(web::Data::new(data.clone()))
+                .wrap(Compress::default())
                 .service(start_page)
                 .service(auth_page)
                 .service(radio_page)
