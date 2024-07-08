@@ -57,7 +57,7 @@ impl From<tokio::sync::mpsc::error::SendError<ToBlocking>> for PageError {
 }
 
 const NUM_BANDWIDTHS: usize = 1;
-const NUM_SEGMENTS: usize = 1;
+const NUM_SEGMENTS: usize = 2;
 
 const BANDWIDTHS: [usize; NUM_BANDWIDTHS] = [22000];
 /// Radio Config sent by the frontend
@@ -168,17 +168,7 @@ async fn radio_config(
 ) -> Result<HttpResponse, PageError> {
     let id = path.into_inner();
     let mut radio_states = state.radio_states.write().await;
-    let radio_state = radio_states.entry(id.clone()).or_insert_with(|| {
-        RwLock::new(RadioState {
-            config: Config {
-                title: "Default Title".to_string(),
-                description: "Default description".to_string(),
-            },
-            playlist: hls::MasterPlaylist::new([hls::MediaPlaylist::new([hls::Segment::new(
-                Box::new(include_bytes!("segment.mp3").clone()),
-            )])]),
-        })
-    });
+    let radio_state = radio_states.get(&id).ok_or(PageError::NotFound)?;
 
     let mut radio_state_locked = radio_state.write().await;
     if let Some(title) = &partial_config.title {
@@ -209,9 +199,10 @@ async fn add_radio(
 
     let new_radio_state = RadioState {
         config,
-        playlist: hls::MasterPlaylist::new([hls::MediaPlaylist::new([hls::Segment::new(
-            Box::new(include_bytes!("segment.mp3").clone()),
-        )])]),
+        playlist: hls::MasterPlaylist::new([hls::MediaPlaylist::new([
+            hls::Segment::new(Box::new(include_bytes!("segment.mp3").clone())),
+            hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone())),
+        ])]),
     };
 
     radio_states.insert(id.clone(), RwLock::new(new_radio_state));
@@ -351,10 +342,13 @@ async fn main() -> std::io::Result<()> {
                 title: "Test".to_owned(),
                 description: "This is a test station, \n ignore".to_owned(),
             },
-            playlist: hls::MasterPlaylist::new([hls::MediaPlaylist::new([hls::Segment::new(
-                // NOTICE: This is a test segment taken from the Public Domain recording of Traditional American blues performed by Al Bernard & The Goofus Five year 1930
-                Box::new(include_bytes!("segment.mp3").clone()),
-            )])]),
+            playlist: hls::MasterPlaylist::new([hls::MediaPlaylist::new([
+                hls::Segment::new(
+                    // NOTICE: This is a test segment taken from the Public Domain recording of Traditional American blues performed by Al Bernard & The Goofus Five year 1930
+                    Box::new(include_bytes!("segment.mp3").clone()),
+                ),
+                hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone())),
+            ])]),
         }),
     );
 
