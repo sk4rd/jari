@@ -1,5 +1,6 @@
 use actix_files::Files;
 use actix_web::{
+    delete,
     error::ResponseError,
     get,
     http::{header::Expires, StatusCode},
@@ -214,6 +215,28 @@ async fn add_radio(
     Ok(HttpResponse::Created().body(format!("Radio added with ID: {}", id)))
 }
 
+#[delete("/{radio}")]
+async fn remove_radio(
+    path: web::Path<String>,
+    state: web::Data<Arc<AppState>>,
+) -> Result<HttpResponse, PageError> {
+    let id = path.into_inner();
+    let mut radio_states = state.radio_states.write().await;
+
+    // Throw NotFound if page with id was not found
+    if !radio_states.contains_key(&id) {
+        return Err(PageError::NotFound.into());
+    }
+
+    radio_states.remove(&id);
+    state
+        .to_blocking
+        .send(ToBlocking::RemoveRadio { radio: id.clone() })
+        .map_err(PageError::from)?;
+
+    Ok(HttpResponse::Ok().body(format!("Radio with ID {} has been removed", id)))
+}
+
 // TODO: Cache playlists
 
 #[routes]
@@ -378,6 +401,7 @@ async fn main() -> std::io::Result<()> {
                 .service(radio_edit)
                 .service(radio_config)
                 .service(add_radio)
+                .service(remove_radio)
                 .service(hls_master)
                 .service(hls_media)
                 .service(hls_segment)
