@@ -2,7 +2,7 @@ use actix_files::Files;
 use actix_web::{
     error::ResponseError,
     get,
-    http::StatusCode,
+    http::{header::Expires, StatusCode},
     put, routes,
     web::{self, Form},
     App, HttpResponse, HttpServer, Responder,
@@ -11,7 +11,7 @@ use clap::Parser;
 use derive_more::{Display, Error};
 use futures::{future::join_all, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, time::SystemTime};
 use tokio::{
     fs::read_to_string,
     select,
@@ -224,18 +224,20 @@ async fn hls_master(
 ) -> Result<HttpResponse, PageError> {
     let id = path.into_inner();
 
-    Ok(HttpResponse::Ok().body(
-        state
-            .radio_states
-            .read()
-            .await
-            .get(&id)
-            .ok_or(PageError::NotFound)?
-            .read()
-            .await
-            .playlist
-            .format_master(&format!("/{id}/listen/"), &BANDWIDTHS),
-    ))
+    Ok(HttpResponse::Ok()
+        .insert_header(("Content-Type", "audio/mpegurl"))
+        .body(
+            state
+                .radio_states
+                .read()
+                .await
+                .get(&id)
+                .ok_or(PageError::NotFound)?
+                .read()
+                .await
+                .playlist
+                .format_master(&format!("/{id}/listen/"), &BANDWIDTHS),
+        ))
 }
 
 #[routes]
@@ -251,20 +253,22 @@ async fn hls_media(
         .find_map(|(i, b)| if b == &band { Some(i) } else { None })
         .ok_or(PageError::NotFound)?;
 
-    Ok(HttpResponse::Ok().body(
-        state
-            .radio_states
-            .read()
-            .await
-            .get(&id)
-            .ok_or(PageError::NotFound)?
-            .read()
-            .await
-            .playlist
-            .format_media(i)
-            .unwrap() // PANICKING: I is always a bandwidth used
-            .clone(),
-    ))
+    Ok(HttpResponse::Ok()
+        .insert_header(("Content-Type", "audio/mpegurl"))
+        .body(
+            state
+                .radio_states
+                .read()
+                .await
+                .get(&id)
+                .ok_or(PageError::NotFound)?
+                .read()
+                .await
+                .playlist
+                .format_media(i)
+                .unwrap() // PANICKING: I is always a bandwidth used
+                .clone(),
+        ))
 }
 
 #[routes]
@@ -280,19 +284,26 @@ async fn hls_segment(
         .find_map(|(i, b)| if b == &band { Some(i) } else { None })
         .ok_or(PageError::NotFound)?;
 
-    Ok(HttpResponse::Ok().body(actix_web::web::Bytes::from(
-        state
-            .radio_states
-            .read()
-            .await
-            .get(&id)
-            .ok_or(PageError::NotFound)?
-            .read()
-            .await
-            .playlist
-            .get_segment_raw(i, seg)
-            .ok_or(PageError::NotFound)?,
-    )))
+    Ok(HttpResponse::Ok()
+        .insert_header(Expires(
+            SystemTime::now()
+                .checked_sub(Duration::from_secs(10))
+                .ok_or(PageError::InternalError)?
+                .into(),
+        ))
+        .body(actix_web::web::Bytes::from(
+            state
+                .radio_states
+                .read()
+                .await
+                .get(&id)
+                .ok_or(PageError::NotFound)?
+                .read()
+                .await
+                .playlist
+                .get_segment_raw(i, seg)
+                .ok_or(PageError::NotFound)?,
+        )))
 }
 
 #[tokio::main]
