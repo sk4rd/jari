@@ -202,10 +202,7 @@ async fn add_radio(
 
     let new_radio_state = RadioState {
         config,
-        playlist: hls::MasterPlaylist::new([hls::MediaPlaylist::new([
-            hls::Segment::new(Box::new(include_bytes!("segment.mp3").clone())),
-            hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone())),
-        ])]),
+        playlist: hls::MasterPlaylist::default(),
         song_map: HashMap::new(),
     };
 

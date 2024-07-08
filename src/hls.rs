@@ -69,6 +69,14 @@ impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
     }
 }
 
+impl<const P: usize, const S: usize> Default for MasterPlaylist<P, S> {
+    fn default() -> Self {
+        Self {
+            playlists: [(); P].map(|_| MediaPlaylist::default()),
+        }
+    }
+}
+
 /// The media playlist, normally of a specific bandwidth, contains its segments with indeces
 /// (S is the amount of segments it can store, this cannot be 0)
 #[derive(Debug, Clone)]
@@ -154,6 +162,16 @@ impl<const S: usize> MediaPlaylist<S> {
     }
 }
 
+impl<const S: usize> Default for MediaPlaylist<S> {
+    fn default() -> Self {
+        Self {
+            current_index: S - 1,
+            current: 0,
+            segments: [(); S].map(|_| Segment::default()),
+        }
+    }
+}
+
 /// A HLS Segment, should contain audio data with header
 #[derive(Debug, Clone)]
 pub struct Segment {
@@ -166,6 +184,14 @@ impl Segment {
     }
     pub const fn new(raw: Box<[u8]>) -> Self {
         Self { raw }
+    }
+}
+
+impl Default for Segment {
+    fn default() -> Self {
+        Self {
+            raw: Box::new(include_bytes!("silence.mp3").clone()),
+        }
     }
 }
 
