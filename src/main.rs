@@ -78,6 +78,7 @@ struct PartialConfig {
 struct RadioState {
     config: Config,
     playlist: hls::MasterPlaylist<NUM_BANDWIDTHS, NUM_SEGMENTS>,
+    song_map: HashMap<String, u8>,
 }
 /// Global async app state
 struct AppState {
@@ -205,6 +206,7 @@ async fn add_radio(
             hls::Segment::new(Box::new(include_bytes!("segment.mp3").clone())),
             hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone())),
         ])]),
+        song_map: HashMap::new(),
     };
 
     radio_states.insert(id.clone(), RwLock::new(new_radio_state));
@@ -236,6 +238,37 @@ async fn remove_radio(
         .map_err(PageError::from)?;
 
     Ok(HttpResponse::Ok().body(format!("Radio with ID {} has been removed", id)))
+}
+
+#[delete("/{radio}/songs/{song}")]
+async fn remove_radio_song(
+    path: web::Path<(String, String)>,
+    state: web::Data<Arc<AppState>>,
+) -> Result<HttpResponse, PageError> {
+    let (radio_id, song_name) = path.into_inner();
+    let radio_states = state.radio_states.read().await;
+    let radio_state = radio_states
+        .get(&radio_id)
+        .ok_or(PageError::NotFound)?
+        .read()
+        .await;
+
+    state
+        .to_blocking
+        .send(ToBlocking::Remove {
+            radio: radio_id.clone(),
+            song: radio_state
+                .song_map
+                .get(&song_name)
+                .ok_or(PageError::NotFound)?
+                .clone(),
+        })
+        .expect("Couldn't send to backend");
+
+    Ok(HttpResponse::Ok().body(format!(
+        "Remove song '{}' from radio with ID {}",
+        song_name, radio_id
+    )))
 }
 
 // TODO: Cache playlists
@@ -388,6 +421,7 @@ async fn main() -> std::io::Result<()> {
                 ),
                 hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone())),
             ])]),
+            song_map: HashMap::new(),
         }),
     );
 
@@ -408,6 +442,7 @@ async fn main() -> std::io::Result<()> {
                 .service(radio_config)
                 .service(add_radio)
                 .service(remove_radio)
+                .service(remove_radio_song)
                 .service(hls_master)
                 .service(hls_media)
                 .service(hls_segment)
