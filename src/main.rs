@@ -94,6 +94,7 @@ struct RadioState {
     config: Config,
     playlist: hls::MasterPlaylist<NUM_BANDWIDTHS, NUM_SEGMENTS>,
     song_map: HashMap<String, u8>,
+    song_order: Vec<String>,
 }
 /// Global async app state
 struct AppState {
@@ -219,6 +220,7 @@ async fn add_radio(
         config,
         playlist: hls::MasterPlaylist::default(),
         song_map: HashMap::new(),
+        song_order: Vec::new(),
     };
 
     radio_states.insert(id.clone(), RwLock::new(new_radio_state));
@@ -289,6 +291,24 @@ async fn upload_song(
 }
 
 #[routes]
+#[get("/{radio}/order")]
+#[get("/{radio}/order/")]
+async fn get_order(
+    path: web::Path<String>,
+    state: web::Data<Arc<AppState>>,
+) -> Result<web::Json<Vec<String>>, PageError> {
+    let radio_id = path.into_inner();
+    let radio_states = state.radio_states.read().await;
+    let radio_state = radio_states
+        .get(&radio_id)
+        .ok_or(PageError::NotFound)?
+        .read()
+        .await;
+
+    Ok(web::Json(radio_state.song_order.clone()))
+}
+
+#[routes]
 #[put("/{radio}/order")]
 #[put("/{radio}/order/")]
 async fn set_order(
@@ -298,20 +318,22 @@ async fn set_order(
 ) -> Result<HttpResponse, PageError> {
     let radio_id = path.into_inner();
     let radio_states = state.radio_states.read().await;
-    let radio_state = radio_states
+    let mut radio_state = radio_states
         .get(&radio_id)
         .ok_or(PageError::ResourceNotFound)?
-        .read()
+        .write()
         .await;
+
+    radio_state.song_order = payload.into_inner();
 
     state
         .to_blocking
         .send(ToBlocking::Order {
             radio: radio_id.clone(),
-            order: payload
-                .into_inner()
-                .into_iter()
-                .map(|name| radio_state.song_map.get(&name).cloned())
+            order: radio_state
+                .song_order
+                .iter()
+                .map(|name| radio_state.song_map.get(name).cloned())
                 .collect::<Option<Vec<u8>>>()
                 .ok_or(PageError::NotFound)?,
         })
@@ -524,6 +546,7 @@ async fn main() -> std::io::Result<()> {
                 hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone())),
             ])]),
             song_map: HashMap::new(),
+            song_order: Vec::new(),
         }),
     );
 
