@@ -42,6 +42,8 @@ enum PageError {
     NotFound,
     #[display(fmt = "Internal server error")]
     InternalError,
+    #[display(fmt = "Error handling multipart data")]
+    MultipartError,
 }
 
 impl ResponseError for PageError {
@@ -49,6 +51,7 @@ impl ResponseError for PageError {
         match self {
             Self::NotFound => StatusCode::NOT_FOUND,
             PageError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
+            PageError::MultipartError => StatusCode::BAD_REQUEST,
         }
     }
 }
@@ -56,6 +59,12 @@ impl ResponseError for PageError {
 impl From<tokio::sync::mpsc::error::SendError<ToBlocking>> for PageError {
     fn from(_: tokio::sync::mpsc::error::SendError<ToBlocking>) -> Self {
         PageError::InternalError
+    }
+}
+
+impl From<actix_multipart::MultipartError> for PageError {
+    fn from(_: actix_multipart::MultipartError) -> Self {
+        PageError::MultipartError
     }
 }
 
