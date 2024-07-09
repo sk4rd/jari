@@ -4,6 +4,7 @@ body {
     padding: 0;
 }
 .header {
+    margin: 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -32,6 +33,55 @@ body {
 .button1:hover {
     background-color: #d97a00;
     transform: scale(1.05);
+}
+
+.scroll-container {
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    width: 100%;
+    padding: 20px;
+    box-sizing: border-box;
+}
+.arrow {
+    font-size: 30px;
+    cursor: pointer;
+    user-select: none;
+}
+.list-wrapper {
+    display: flex;
+    overflow: hidden;
+    width: calc(100% - 60px);
+}
+    .list {
+        display: flex;
+        flex-wrap: nowrap;
+        transition: transform 0.3s ease; /* Smooth transition for better UX */
+    }
+
+    .container {
+        border: 2px solid black;
+        width: 300px;
+        height: 400px;
+        margin-right: 10px;
+        padding: 10px;
+        box-sizing: border-box;
+        flex-shrink: 0; /* Prevents the containers from shrinking */
+    }
+.image {
+    border: 2px solid #d97a00;
+    width: 100%;
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.image img {
+    max-width: 100%;
+    max-height: 100%;
+}
+.text {
+    margin-top: 10px;
 }
 
 .content {
