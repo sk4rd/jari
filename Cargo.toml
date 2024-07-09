@@ -20,3 +20,4 @@ id3 = { version = "1.13.1", features = ["tokio"] }
 byteorder = "1.5.0"
 symphonia = "0.5.4"
 rayon = "1.10.0"
+itertools = "0.13.0"
