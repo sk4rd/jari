@@ -18,15 +18,26 @@
           border-bottom: 1px solid #ccc;
       }
       .header .title {
-          font-size: 24px;
-          font-weight: bold;
+        font-size: 24px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: transform 0.3s ease, color 0.3s ease;
       }
-      .header button1 {
-          padding: 10px 20px;
-          font-size: 16px;
-          cursor: pointer;
-          background-color: #f39200;
-          border: none;
+      .header .title:hover {
+        transform: scale(1.1);
+        color: #007BFF;
+      }
+      .header .button1 {
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        background-color: #f39200;
+        border: none;
+        transition: background-color 0.3s ease, transform 0.3s ease;
+      }
+      .header .button1:hover {
+        background-color: #d97a00;
+        transform: scale(1.05);
       }
       .content {
           padding: 20px;
@@ -52,7 +63,7 @@
           <button type="submit">Suchen</button>
         </form>
       </section>
-      <button1 onclick="window.location.href='login.html'">Go to Login</button1>
+      <button class="button1" onclick="window.location.href='login.html'">Go to Login</button>
   </header>
     <h1>Radio Page</h1>
     <p>{name}</p>
