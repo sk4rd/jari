@@ -14,6 +14,7 @@ use actix_web::{
 use clap::Parser;
 use derive_more::{Display, Error};
 use futures::{future::join_all, StreamExt};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf, sync::Arc, time::SystemTime};
 use tokio::{
@@ -236,6 +237,7 @@ async fn upload_song(
 ) -> Result<HttpResponse, PageError> {
     let (radio_id, song_id) = path.into_inner();
     let mut song_data: Vec<u8> = Vec::new();
+    let mut radio_states = state.radio_states.read().await;
 
     // Process each part in the multipart payload
     while let Some(item) = payload.next().await {
@@ -253,11 +255,25 @@ async fn upload_song(
         }
     }
 
+    let mut radio_state = radio_states
+        .get(&radio_id)
+        .ok_or(PageError::NotFound)?
+        .write()
+        .await;
+
+    let id = radio_state
+        .song_map
+        .values()
+        .sorted()
+        .fold(0, |a, e| if *e == a { e + 1 } else { a });
+
+    radio_state.song_map.insert(song_id.clone(), id);
+
     state
         .to_blocking
         .send(ToBlocking::Upload {
             radio: radio_id.clone(),
-            song: song_id.clone().parse::<u8>().unwrap(),
+            song: id,
             data: song_data.into_boxed_slice(),
         })
         .map_err(PageError::from)?;
