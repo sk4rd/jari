@@ -9,6 +9,7 @@ edition = "2021"
 actix = "=0.13.3"
 actix-web = { version = "=4.5.1", features = ["rustls"] }
 actix-files = "0.6.6"
+actix-multipart = "0.7.2"
 clap = {version = "=4.4.18", features = ["derive"]}
 derive_more = "0.99.17"
 futures = "0.3.30"
@@ -17,3 +18,5 @@ tokio = { version = "=1.36.0", features = ["full"] }
 tokio-stream = "0.1.15"
 id3 = { version = "1.13.1", features = ["tokio"] }
 byteorder = "1.5.0"
+symphonia = "0.5.4"
+rayon = "1.10.0"

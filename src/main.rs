@@ -1,5 +1,7 @@
 use actix_files::Files;
+use actix_multipart::Multipart;
 use actix_web::{
+    body::MessageBody,
     delete,
     error::ResponseError,
     get,
@@ -7,7 +9,7 @@ use actix_web::{
     middleware::Compress,
     put, routes,
     web::{self, Form},
-    App, HttpResponse, HttpServer, Responder,
+    App, HttpResponse, HttpServer, Responder, Result,
 };
 use clap::Parser;
 use derive_more::{Display, Error};
@@ -41,6 +43,8 @@ enum PageError {
     NotFound,
     #[display(fmt = "Internal server error")]
     InternalError,
+    #[display(fmt = "Error handling multipart data")]
+    MultipartError,
 }
 
 impl ResponseError for PageError {
@@ -48,6 +52,7 @@ impl ResponseError for PageError {
         match self {
             Self::NotFound => StatusCode::NOT_FOUND,
             PageError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
+            PageError::MultipartError => StatusCode::BAD_REQUEST,
         }
     }
 }
@@ -55,6 +60,12 @@ impl ResponseError for PageError {
 impl From<tokio::sync::mpsc::error::SendError<ToBlocking>> for PageError {
     fn from(_: tokio::sync::mpsc::error::SendError<ToBlocking>) -> Self {
         PageError::InternalError
+    }
+}
+
+impl From<actix_multipart::MultipartError> for PageError {
+    fn from(_: actix_multipart::MultipartError) -> Self {
+        PageError::MultipartError
     }
 }
 
@@ -213,6 +224,49 @@ async fn add_radio(
         .map_err(PageError::from)?;
 
     Ok(HttpResponse::Created().body(format!("Radio added with ID: {}", id)))
+}
+
+#[routes]
+#[put("/{radio}/songs/{song}")]
+#[put("/{radio}/songs/{song}/")]
+async fn upload_song(
+    path: web::Path<(String, String)>,
+    mut payload: Multipart,
+    state: web::Data<Arc<AppState>>,
+) -> Result<HttpResponse, PageError> {
+    let (radio_id, song_id) = path.into_inner();
+    let mut song_data: Vec<u8> = Vec::new();
+
+    // Process each part in the multipart payload
+    while let Some(item) = payload.next().await {
+        let mut field = item.map_err(|_| PageError::MultipartError)?;
+
+        // Handle the content disposition to correctly find the file part
+        if let Some(content_disposition) = field.content_disposition() {
+            if content_disposition.get_name() == Some("file") {
+                // Read the file data part-by-part
+                while let Some(chunk) = field.next().await {
+                    let data = chunk.map_err(|_| PageError::MultipartError)?;
+                    song_data.extend_from_slice(&data);
+                }
+            }
+        }
+    }
+
+    state
+        .to_blocking
+        .send(ToBlocking::Upload {
+            radio: radio_id.clone(),
+            song: song_id.clone().parse::<u8>().unwrap(),
+            data: song_data.into_boxed_slice(),
+        })
+        .map_err(PageError::from)?;
+
+    // Send a confirmation response
+    Ok(HttpResponse::Ok().body(format!(
+        "Song '{}' successfully uploaded to radio '{}'.",
+        song_id, radio_id
+    )))
 }
 
 #[routes]
@@ -454,8 +508,17 @@ async fn main() -> std::io::Result<()> {
         }),
     );
 
+    let mut blocking_radio_map = HashMap::new();
+    blocking_radio_map.extend(
+        data.radio_states
+            .read()
+            .await
+            .iter()
+            .map(|(name, _state)| (name.clone(), vec![])), // TODO: get order from file
+    );
+
     // Start blocking thread
-    std::thread::spawn(|| blocking::main(atx, srx, Duration::from_secs(10)));
+    std::thread::spawn(|| blocking::main(atx, srx, Duration::from_secs(10), blocking_radio_map));
 
     // Start web server task
     let server = {
@@ -470,6 +533,7 @@ async fn main() -> std::io::Result<()> {
                 .service(radio_edit)
                 .service(radio_config)
                 .service(add_radio)
+                .service(upload_song)
                 .service(set_order)
                 .service(remove_radio)
                 .service(remove_radio_song)
