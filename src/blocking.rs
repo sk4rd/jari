@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use tokio::time::Instant;
 
@@ -24,7 +24,7 @@ pub enum ToBlocking {
 }
 /// The blocking thread, contains mainly audio processing
 pub fn main(
-    _atx: tokio::sync::mpsc::UnboundedSender<(
+    atx: tokio::sync::mpsc::UnboundedSender<(
         Instant,
         Vec<(String, [Segment; crate::NUM_BANDWIDTHS])>,
     )>,
@@ -32,14 +32,38 @@ pub fn main(
     interval: Duration,
 ) {
     let mut last = std::time::Instant::now();
+    let _start = last.clone();
     let seg = Segment::new(Box::new(include_bytes!("segment2.mp3").clone()));
+    let mut radios = HashMap::new();
     loop {
         // Check for messages
         match srx.try_recv() {
             Ok(msg) => match msg {
-                // TODO(audio): handle messages
-                _ => {
-                    println!("{msg:?}");
+                ToBlocking::Upload { radio, song, data } => {
+                    // TODO(audio): save songs (batching)
+                }
+                ToBlocking::Order { radio, order } => {
+                    let Some(radio_lock) = radios.get_mut(&radio) else {
+                        eprintln!("Tried to set the order for non-existent radio {radio}!");
+                        break;
+                    };
+                    *radio_lock = order;
+                }
+                ToBlocking::Remove { radio, song } => {
+                    let Some(radio_lock) = radios.get_mut(&radio) else {
+                        eprintln!("Tried to remove song from non-existent radio {radio}!");
+                        break;
+                    };
+                    radio_lock.retain(|e| e != &song);
+                    // TODO(audio): remove files
+                }
+                ToBlocking::RemoveRadio { radio } => {
+                    radios.remove(&radio);
+                    // TODO(audio): remove files
+                }
+                ToBlocking::AddRadio { radio } => {
+                    radios.insert(radio, vec![]);
+                    // TODO(audio): add files
                 }
             },
             Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {}
@@ -50,7 +74,7 @@ pub fn main(
         if diff > interval {
             // TODO: send/create next fragment
             last += interval;
-            _atx.send((
+            atx.send((
                 last.clone().into(),
                 vec![("test".to_string(), [seg.clone()])],
             ))
