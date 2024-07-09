@@ -576,6 +576,7 @@ async fn main() -> std::io::Result<()> {
                 .service(radio_config)
                 .service(add_radio)
                 .service(upload_song)
+                .service(get_order)
                 .service(set_order)
                 .service(remove_radio)
                 .service(remove_radio_song)
