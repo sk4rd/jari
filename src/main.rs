@@ -46,6 +46,8 @@ enum PageError {
     InternalError,
     #[display(fmt = "Error handling multipart data")]
     MultipartError,
+    #[display(fmt = "Resource doesn't exist")]
+    ResourceNotFound,
 }
 
 impl ResponseError for PageError {
@@ -54,6 +56,7 @@ impl ResponseError for PageError {
             Self::NotFound => StatusCode::NOT_FOUND,
             PageError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
             PageError::MultipartError => StatusCode::BAD_REQUEST,
+            PageError::ResourceNotFound => StatusCode::BAD_REQUEST,
         }
     }
 }
@@ -297,7 +300,7 @@ async fn set_order(
     let radio_states = state.radio_states.read().await;
     let radio_state = radio_states
         .get(&radio_id)
-        .ok_or(PageError::NotFound)?
+        .ok_or(PageError::ResourceNotFound)?
         .read()
         .await;
 
