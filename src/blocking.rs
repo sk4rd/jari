@@ -30,11 +30,11 @@ pub fn main(
     )>,
     mut srx: tokio::sync::mpsc::UnboundedReceiver<ToBlocking>,
     interval: Duration,
+    mut radios: HashMap<String, Vec<u8>>,
 ) {
     let mut last = std::time::Instant::now();
     let _start = last.clone();
     let seg = Segment::new(Box::new(include_bytes!("segment2.mp3").clone()));
-    let mut radios = HashMap::new();
     loop {
         // Check for messages
         match srx.try_recv() {

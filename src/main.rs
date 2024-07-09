@@ -455,8 +455,17 @@ async fn main() -> std::io::Result<()> {
         }),
     );
 
+    let mut blocking_radio_map = HashMap::new();
+    blocking_radio_map.extend(
+        data.radio_states
+            .read()
+            .await
+            .iter()
+            .map(|(name, _state)| (name.clone(), vec![])), // TODO: get order from file
+    );
+
     // Start blocking thread
-    std::thread::spawn(|| blocking::main(atx, srx, Duration::from_secs(10)));
+    std::thread::spawn(|| blocking::main(atx, srx, Duration::from_secs(10), blocking_radio_map));
 
     // Start web server task
     let server = {
