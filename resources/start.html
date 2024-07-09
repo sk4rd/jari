@@ -2,80 +2,12 @@
 <html>
     <head>
         <title>Start</title>
+        <!-- Font Awesome CSS -->
         <link href="./fonts/font-awesome/css/fontawesome.css" rel="stylesheet"/>
         <link href="./fonts/font-awesome/css/solid.css" rel="stylesheet"/>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                margin: 0;
-                padding: 0;
-            }
-            .header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 10px 20px;
-                background-color: #f4f4f4;
-                border-bottom: 1px solid #ccc;
-            }
-            .header .title {
-                font-size: 24px;
-                font-weight: bold;
-                cursor: pointer;
-                transition: transform 0.3s ease, color 0.3s ease;
-            }
-            .header .title:hover {
-                transform: scale(1.1);
-                color: #007BFF;
-            }
-            .header .button1 {
-                padding: 10px 20px;
-                font-size: 16px;
-                cursor: pointer;
-                background-color: #f39200;
-                border: none;
-                transition: background-color 0.3s ease, transform 0.3s ease;
-            }
-            .header .button1:hover {
-                background-color: #d97a00;
-                transform: scale(1.05);
-            }
+        <!-- External CSS -->
+        <link rel="stylesheet" href="css/start.css">
 
-            .content {
-                padding: 20px;
-            }
-            #search {
-                width: 100%;
-                padding: 10px;
-                box-sizing: border-box;
-            }
-            /* Style the form to use full width */
-            form {
-                display: flex;
-                width: 100%;
-            }
-            /* Style the input to use full width */
-            input[type="text"] {
-                flex: 1;
-                padding: 10px;
-                box-sizing: border-box;
-                border: 1px solid #ccc;
-                border-radius: 4px 0 0 4px;
-            }
-            /* Style the button */
-            button {
-                padding: 10px;
-                border: 1px solid #ccc;
-                border-left: 0;
-                border-radius: 0 4px 4px 0;
-                background-color: #007BFF;
-                color: white;
-                cursor: pointer;
-            }
-            button:hover {
-                background-color: #0056b3;
-            }
-        </style>
 
     </head>
     <body>
@@ -85,8 +17,9 @@
     </header>
     <section id="search">
         <form action="/search" method="get">
-            <input type="text" id="search-input" name="q" required value="Radiosuche:">
-            <button type="submit">Suchen</button>
+            <input type="text" id="search-input" name="q" required placeholder="Radiosuche:">
+            <br>
+            <button class="button1" type="submit">Suchen</button>
         </form>
     </section>
     <!-- <i class="fa-solid fa-user"></i> </>-->

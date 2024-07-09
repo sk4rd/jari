@@ -1,0 +1,47 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: #f4f4f4;
+    border-bottom: 1px solid #ccc;
+}
+.header .title {
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.3s ease, color 0.3s ease;
+}
+.header .title:hover {
+    transform: scale(1.1);
+    color: #007BFF;
+}
+.header .button1 {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: #f39200;
+    border: none;
+    transition: background-color 0.3s ease, transform 0.3s ease;
+}
+.header .button1:hover {
+    background-color: #d97a00;
+    transform: scale(1.05);
+}
+.content {
+    padding: 20px;
+}
+audio{
+    width: 80%;
+    background-color: rgba(0, 0, 0, 0.2);
+    display: flex;
+    margin: 0 auto;
+}
+label{
+    color: #F39200FF;
+}
