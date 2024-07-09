@@ -237,7 +237,7 @@ async fn upload_song(
 ) -> Result<HttpResponse, PageError> {
     let (radio_id, song_id) = path.into_inner();
     let mut song_data: Vec<u8> = Vec::new();
-    let mut radio_states = state.radio_states.read().await;
+    let radio_states = state.radio_states.read().await;
 
     // Process each part in the multipart payload
     while let Some(item) = payload.next().await {
