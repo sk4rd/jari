@@ -21,21 +21,38 @@
           font-size: 24px;
           font-weight: bold;
       }
-      .header button {
+      .header button1 {
           padding: 10px 20px;
           font-size: 16px;
           cursor: pointer;
+          background-color: #f39200;
+          border: none;
       }
       .content {
           padding: 20px;
       }
+      audio{
+        width: 80%;
+        background-color: rgba(0, 0, 0, 0.2);
+        display: flex;
+        margin: 0 auto;
+      }
+      label{
+        color: #F39200FF;
+      }
   </style>
   
   </head>
-  <body style="background-color: rgb(100, 99, 99);">
-    <header class="header" style="background-color: rgb(100, 99, 99);">
-      <div class="title" style="color: rgb(243, 146, 0);">JARI</div>
-      <button onclick="window.location.href='login.html'">Go to Login</button>
+  <body >
+    <header class="header" style="background-color: rgb(128,128,128);">
+      <div id="text" onClick="window.location.href='start.html'" class="title" style="color: rgb(243, 146, 0);"> JARI </div>
+      <section id="search">
+        <form action="/search" method="get">
+          <input type="text" id="search-input" name="q" required value="Radiosuche:">
+          <button type="submit">Suchen</button>
+        </form>
+      </section>
+      <button1 onclick="window.location.href='login.html'">Go to Login</button1>
   </header>
     <h1>Radio Page</h1>
     <p>{name}</p>
@@ -51,14 +68,7 @@
     </p>
 
     <p>
-        <section id="search">
-          <h2>Suche</h2>
-          <form action="/search" method="get">
-              <label for="search-input">Suchbegriff:</label>
-              <input type="text" id="search-input" name="q" required>
-              <button type="submit">Suchen</button>
-          </form>
-      </section>
+
     </p>
 
   </body>
