@@ -1,4 +1,5 @@
 use actix_files::Files;
+use actix_multipart::Multipart;
 use actix_web::{
     delete,
     error::ResponseError,
