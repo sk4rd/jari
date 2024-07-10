@@ -8,6 +8,7 @@
     <!-- External CSS -->
     <link rel="stylesheet" href="css/radio.css">
   
+    <script src="radio.js"></script>
   </head>
   <body >
     <header class="header" style="background-color: rgb(128,128,128);">
@@ -15,7 +16,7 @@
       <section id="search">
         <form action="/search" method="get">
           <input type="text" id="search-input" name="Radiosuche" placeholder="Suche ein Radio:" required>
-          <button class="button1" type="submit"><i class="fa-solid fa-search"></i></button>
+          <button class="button1" type="submit" id="buttonRadiosuche"><i class="fa-solid fa-search"></i></button>
         </form>
       </section>
       <button class="button1" onclick="window.location.href='login.html'">Go to Login</button>
