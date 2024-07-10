@@ -47,6 +47,11 @@ pub fn main(
             match srx.try_recv() {
                 Ok(msg) => match msg {
                     ToBlocking::Upload { radio, song, data } => {
+                        let Ok(()) = create_dir(root_dir.join(&radio).join(song.to_string()))
+                        else {
+                            eprintln!("Couldn't create dir for song {song} in radio {radio}");
+                            break 'mesg_check;
+                        };
                         // TODO(audio): save songs (batching)
                     }
                     ToBlocking::Order { radio, order } => {
