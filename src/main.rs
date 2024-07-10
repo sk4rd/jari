@@ -66,102 +66,6 @@ pub struct AppState {
     radio_states: RwLock<HashMap<String, RwLock<RadioState>>>,
 }
 
-// TODO: Cache playlists
-
-#[routes]
-#[get("/{radio}/listen/master.m3u8")]
-async fn hls_master(
-    path: web::Path<String>,
-    state: web::Data<Arc<AppState>>,
-) -> Result<HttpResponse, PageError> {
-    let id = path.into_inner();
-
-    Ok(HttpResponse::Ok()
-        .insert_header(("Content-Type", "audio/mpegurl"))
-        .body(
-            state
-                .radio_states
-                .read()
-                .await
-                .get(&id)
-                .ok_or(PageError::NotFound)?
-                .read()
-                .await
-                .playlist
-                .format_master(&format!("/{id}/listen/"), &BANDWIDTHS),
-        ))
-}
-
-#[routes]
-#[get("/{radio}/listen/{bandwidth}/playlist.m3u8")]
-async fn hls_media(
-    path: web::Path<(String, usize)>,
-    state: web::Data<Arc<AppState>>,
-) -> Result<HttpResponse, PageError> {
-    let (id, band) = path.into_inner();
-    let i = BANDWIDTHS
-        .iter()
-        .enumerate()
-        .find_map(|(i, b)| if b == &band { Some(i) } else { None })
-        .ok_or(PageError::NotFound)?;
-
-    Ok(HttpResponse::Ok()
-        .insert_header(("Content-Type", "audio/mpegurl"))
-        .body(
-            state
-                .radio_states
-                .read()
-                .await
-                .get(&id)
-                .ok_or(PageError::NotFound)?
-                .read()
-                .await
-                .playlist
-                .format_media(i)
-                .unwrap() // PANICKING: I is always a bandwidth used
-                .clone(),
-        ))
-}
-
-#[routes]
-#[get("/{radio}/listen/{bandwidth}/{segment}.mp3")]
-async fn hls_segment(
-    path: web::Path<(String, usize, usize)>,
-    state: web::Data<Arc<AppState>>,
-) -> Result<HttpResponse, PageError> {
-    let (id, band, seg) = path.into_inner();
-    let i = BANDWIDTHS
-        .iter()
-        .enumerate()
-        .find_map(|(i, b)| if b == &band { Some(i) } else { None })
-        .ok_or(PageError::NotFound)?;
-    let radio_states_read = state.radio_states.read().await;
-    let radio_state = radio_states_read
-        .get(&id)
-        .ok_or(PageError::NotFound)?
-        .read()
-        .await;
-    Ok(HttpResponse::Ok()
-        .insert_header(Expires(
-            SystemTime::now()
-                .checked_add(Duration::from_secs(
-                    10 * (radio_state
-                        .playlist
-                        .current()
-                        .checked_sub(seg)
-                        .ok_or(PageError::NotFound)?) as u64 as u64,
-                ))
-                .ok_or(PageError::InternalError)?
-                .into(),
-        ))
-        .body(actix_web::web::Bytes::from(
-            radio_state
-                .playlist
-                .get_segment_raw(i, seg)
-                .ok_or(PageError::NotFound)?,
-        )))
-}
-
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let args = Args::parse();
@@ -261,9 +165,9 @@ async fn main() -> std::io::Result<()> {
                 .service(set_song_order)
                 .service(remove_radio)
                 .service(remove_song)
-                .service(hls_master)
-                .service(hls_media)
-                .service(hls_segment)
+                .service(hls::get_master)
+                .service(hls::get_media)
+                .service(hls::get_segment)
                 .service(Files::new("/reserved", "./resources").prefer_utf8(true))
         })
         .bind(("0.0.0.0", port))?
