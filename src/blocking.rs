@@ -49,7 +49,7 @@ pub fn main(
                     ToBlocking::Upload { radio, song, data } => {
                         let Ok(()) = create_dir(root_dir.join(&radio).join(song.to_string()))
                         else {
-                            eprintln!("Couldn't create dir for song {song} in radio {radio}");
+                            eprintln!("Couldn't create dir for song {song} in radio {radio} with root {}!", root_dir.display());
                             break 'mesg_check;
                         };
                         // TODO(audio): save songs (batching)
@@ -69,21 +69,27 @@ pub fn main(
                         radio_lock.retain(|e| e != &song);
                         let Ok(()) = remove_dir_all(root_dir.join(&radio).join(song.to_string()))
                         else {
-                            eprintln!("Couldn't remove dir for song {song} in radio {radio}");
+                            eprintln!("Couldn't remove dir for song {song} in radio {radio} with root {}!", root_dir.display());
                             break 'mesg_check;
                         };
                     }
                     ToBlocking::RemoveRadio { radio } => {
                         radios.remove(&radio);
                         let Ok(()) = remove_dir_all(root_dir.join(&radio)) else {
-                            eprintln!("Couldn't remove dir for radio {radio}");
+                            eprintln!(
+                                "Couldn't remove dir for radio {radio} with root {}!",
+                                root_dir.display()
+                            );
                             break 'mesg_check;
                         };
                     }
                     ToBlocking::AddRadio { radio } => {
                         radios.insert(radio.clone(), vec![]);
                         let Ok(()) = create_dir(root_dir.join(&radio)) else {
-                            eprintln!("Couldn't create dir for radio {radio}");
+                            eprintln!(
+                                "Couldn't create dir for radio {radio} with root {}!",
+                                root_dir.display()
+                            );
                             break 'mesg_check;
                         };
                     }
