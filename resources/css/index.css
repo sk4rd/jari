@@ -38,6 +38,19 @@ body {
     color: #f39200;
 }
 
+.div2 {
+    font-size: 24px;
+    margin-top: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.3s ease, color 0.3s ease;
+}
+
+.div2:hover {
+    transform: scale(1.01);
+    color: #f39200;
+}
+
 .button1 {
     padding: 10px 20px;
     font-size: 16px;
