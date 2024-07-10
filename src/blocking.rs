@@ -1,4 +1,9 @@
-use std::{collections::HashMap, time::Duration};
+use std::{
+    collections::HashMap,
+    fs::{create_dir, remove_dir_all},
+    path::PathBuf,
+    time::Duration,
+};
 
 use tokio::time::Instant;
 
@@ -31,43 +36,56 @@ pub fn main(
     mut srx: tokio::sync::mpsc::UnboundedReceiver<ToBlocking>,
     interval: Duration,
     mut radios: HashMap<String, Vec<u8>>,
+    root_dir: PathBuf,
 ) {
     let mut last = std::time::Instant::now();
     let _start = last.clone();
     let seg = Segment::new(Box::new(include_bytes!("segment2.mp3").clone()));
     loop {
         // Check for messages
-        match srx.try_recv() {
-            Ok(msg) => match msg {
-                ToBlocking::Upload { radio, song, data } => {
-                    // TODO(audio): save songs (batching)
-                }
-                ToBlocking::Order { radio, order } => {
-                    let Some(radio_lock) = radios.get_mut(&radio) else {
-                        eprintln!("Tried to set the order for non-existent radio {radio}!");
-                        break;
-                    };
-                    *radio_lock = order;
-                }
-                ToBlocking::Remove { radio, song } => {
-                    let Some(radio_lock) = radios.get_mut(&radio) else {
-                        eprintln!("Tried to remove song from non-existent radio {radio}!");
-                        break;
-                    };
-                    radio_lock.retain(|e| e != &song);
-                    // TODO(audio): remove files
-                }
-                ToBlocking::RemoveRadio { radio } => {
-                    radios.remove(&radio);
-                    // TODO(audio): remove files
-                }
-                ToBlocking::AddRadio { radio } => {
-                    radios.insert(radio, vec![]);
-                    // TODO(audio): add files
-                }
-            },
-            Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {}
-            Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return,
+        'mesg_check: {
+            match srx.try_recv() {
+                Ok(msg) => match msg {
+                    ToBlocking::Upload { radio, song, data } => {
+                        // TODO(audio): save songs (batching)
+                    }
+                    ToBlocking::Order { radio, order } => {
+                        let Some(radio_lock) = radios.get_mut(&radio) else {
+                            eprintln!("Tried to set the order for non-existent radio {radio}!");
+                            break 'mesg_check;
+                        };
+                        *radio_lock = order;
+                    }
+                    ToBlocking::Remove { radio, song } => {
+                        let Some(radio_lock) = radios.get_mut(&radio) else {
+                            eprintln!("Tried to remove song from non-existent radio {radio}!");
+                            break 'mesg_check;
+                        };
+                        radio_lock.retain(|e| e != &song);
+                        let Ok(()) = remove_dir_all(root_dir.join(&radio).join(song.to_string()))
+                        else {
+                            eprintln!("Couldn't remove dir for song {song} in radio {radio}");
+                            break 'mesg_check;
+                        };
+                    }
+                    ToBlocking::RemoveRadio { radio } => {
+                        radios.remove(&radio);
+                        let Ok(()) = remove_dir_all(root_dir.join(&radio)) else {
+                            eprintln!("Couldn't remove dir for radio {radio}");
+                            break 'mesg_check;
+                        };
+                    }
+                    ToBlocking::AddRadio { radio } => {
+                        radios.insert(radio.clone(), vec![]);
+                        let Ok(()) = create_dir(root_dir.join(&radio)) else {
+                            eprintln!("Couldn't create dir for radio {radio}");
+                            break 'mesg_check;
+                        };
+                    }
+                },
+                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {}
+                Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return,
+            }
         }
         // Check if interval has been reached
         let diff = last.elapsed();

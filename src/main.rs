@@ -557,8 +557,18 @@ async fn main() -> std::io::Result<()> {
             .map(|(name, _state)| (name.clone(), vec![])), // TODO: get order from file
     );
 
+    let song_data_dir = PathBuf::from("./data");
+
     // Start blocking thread
-    std::thread::spawn(|| blocking::main(atx, srx, Duration::from_secs(10), blocking_radio_map));
+    std::thread::spawn(|| {
+        blocking::main(
+            atx,
+            srx,
+            Duration::from_secs(10),
+            blocking_radio_map,
+            song_data_dir,
+        )
+    });
 
     // Start web server task
     let server = {
