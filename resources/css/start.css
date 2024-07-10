@@ -135,3 +135,27 @@ input[type="text"] {
 ::placeholder {
     color: #999;
 }
+
+.list-item {
+    display: flex;
+    border: 2px solid black;
+    width: 600pt;
+    height: 100px;
+    margin-bottom: 1%;
+    margin-left: auto;
+    margin-right: auto;
+}
+.list-item img {
+    width: 80px;
+    height: 80px;
+    border: 1px solid #d97a00;
+    margin: 10px;
+}
+.list-item .content {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 2px;
+}
+.list-item .content .title {
+    font-weight: bold;
+}
