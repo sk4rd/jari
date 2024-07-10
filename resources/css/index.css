@@ -68,15 +68,37 @@ body {
 }
 
 #search {
-    width: 100%;
+    width: 80%;
     display: flex;
+    margin-left: auto;
+    margin-right: auto;
     justify-content: center; /* Center the search bar */
-    margin: 20px 0;
+}
+
+#search1 {
+    width: 80%;
+    display: flex;
+    margin-bottom: 10pt;
+    margin-top: 10pt;
+    margin-left: auto;
+    margin-right: auto;
+    justify-content: center; /* Center the search bar */
 }
 
 form {
     display: flex;
     width: 80%;
+}
+.header-radio{
+
+    margin: 1%;
+    font-size: 40pt;
+}
+
+.description-radio{
+    font-size: 30pt;
+    margin-left: 1%;
+    margin-bottom: 5%;
 }
 
 input[type="text"] {
@@ -100,6 +122,26 @@ input[type="text"] {
     margin-bottom: 1%;
     margin-left: auto;
     margin-right: auto;
+}
+.list-item2 {
+    display: flex;
+    width: 100%;
+    height: 200px;
+    margin-bottom: 1%;
+    margin-left: auto;
+    margin-right: auto;
+}
+.list-item2 img {
+    width: 160px;
+    height: 160px;
+    border: 1px solid #d97a00;
+    margin: 10px;
+}
+.list-item2 .content {
+    display: flex;
+    flex-direction: column;
+    width: inherit;
+    margin-bottom: 2px;
 }
 
 .list-item img {
@@ -128,4 +170,52 @@ audio {
 
 label {
     color: #F39200FF;
+}
+
+.audio-player {
+    display: flex;
+    align-items: center;
+    background: #ffffff;
+    padding: 10px 20px;
+    border-radius: 50px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.play-pause-btn {
+    background: #ff6f61;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    outline: none;
+    transition: background 0.3s;
+}
+
+.play-pause-btn:hover {
+    background: #ff8578;
+}
+
+.play-icon, .pause-icon {
+    color: #ffffff;
+    font-size: 24px;
+    display: none;
+}
+
+.play-icon.show, .pause-icon.show {
+    display: block;
+}
+
+.seek-slider {
+    width: 200px;
+    margin: 0 10px;
+    cursor: pointer;
+}
+
+.current-time, .duration {
+    font-size: 14px;
+    color: #333;
 }
