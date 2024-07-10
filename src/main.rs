@@ -1,15 +1,13 @@
 use actix_files::Files;
 use actix_web::{
-    http::header::Expires,
     middleware::Compress,
-    routes,
     web::{self},
-    App, HttpResponse, HttpServer, Result,
+    App, HttpServer, Result,
 };
 use clap::Parser;
 use futures::{future::join_all, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf, sync::Arc, time::SystemTime};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tokio::{
     fs::read_to_string,
     select,
@@ -22,7 +20,6 @@ mod blocking;
 use blocking::ToBlocking;
 
 mod errors;
-use errors::PageError;
 
 mod handlers;
 use handlers::*;
