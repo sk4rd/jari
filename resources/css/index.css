@@ -14,18 +14,22 @@ header * {
     border-radius: 2pt;
 }
 
+a {
+    text-decoration: none;
+}
+
 .header {
     margin: 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 20px;
+    padding: 10pt 20pt;
     background-color: #f4f4f4;
-    border-bottom: 1px solid #ccc;
+    border-bottom: 1pt solid #ccc;
 }
 
 .header .title {
-    font-size: 24px;
+    font-size: 24pt;
     font-weight: bold;
     cursor: pointer;
     transition: transform 0.3s ease, color 0.3s ease;
@@ -37,7 +41,7 @@ header * {
 }
 
 .div1 {
-    font-size: 24px;
+    font-size: 24pt;
     font-weight: bold;
     cursor: pointer;
     transition: transform 0.3s ease, color 0.3s ease;
@@ -49,8 +53,8 @@ header * {
 }
 
 .div2 {
-    font-size: 24px;
-    margin-top: 10px;
+    font-size: 24pt;
+    margin-top: 10pt;
     font-weight: bold;
     cursor: pointer;
     transition: transform 0.3s ease, color 0.3s ease;
@@ -64,8 +68,8 @@ header * {
     color: rgba(0, 0, 0, 0.5);
 }
 .button1 {
-    padding: 10px 20px;
-    font-size: 16px;
+    padding: 10pt 20pt;
+    font-size: 16pt;
     cursor: pointer;
     background-color: #f39200;
     border: none;
@@ -113,11 +117,11 @@ form {
 
 input[type="text"] {
     flex: 1;
-    padding: 10px;
+    padding: 10pt;
     box-sizing: border-box;
-    border: 1px solid #ccc;
-    border-radius: 4px 0 0 4px;
-    font-size: 16px;
+    border: 1pt solid #ccc;
+    border-radius: 4pt 0 0 4pt;
+    font-size: 16pt;
 }
 
 ::placeholder {
@@ -126,9 +130,9 @@ input[type="text"] {
 
 .list-item {
     display: flex;
-    border: 2px solid black;
+    border: 2pt solid black;
     width: 600pt;
-    height: 100px;
+    height: 100pt;
     margin-bottom: 1%;
     margin-left: auto;
     margin-right: auto;
@@ -136,35 +140,35 @@ input[type="text"] {
 .list-item2 {
     display: flex;
     width: 100%;
-    height: 200px;
+    height: 200pt;
     margin-bottom: 1%;
     margin-left: auto;
     margin-right: auto;
 }
 .list-item2 img {
-    width: 160px;
-    height: 160px;
-    border: 1px solid #d97a00;
-    margin: 10px;
+    width: 160pt;
+    height: 160pt;
+    border: 1pt solid #d97a00;
+    margin: 10pt;
 }
 .list-item2 .content {
     display: flex;
     flex-direction: column;
     width: inherit;
-    margin-bottom: 2px;
+    margin-bottom: 2pt;
 }
 
 .list-item img {
-    width: 80px;
-    height: 80px;
-    border: 1px solid #d97a00;
-    margin: 10px;
+    width: 80pt;
+    height: 80pt;
+    border: 1pt solid #d97a00;
+    margin: 10pt;
 }
 
 .list-item .content {
     display: flex;
     flex-direction: column;
-    margin-bottom: 2px;
+    margin-bottom: 2pt;
 }
 
 .list-item .content .title {
@@ -186,17 +190,17 @@ label {
     display: flex;
     align-items: center;
     background: #ffffff;
-    padding: 10px 20px;
-    border-radius: 50px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    padding: 10pt 20pt;
+    border-radius: 50pt;
+    box-shadow: 0 4pt 8pt rgba(0, 0, 0, 0.1);
 }
 
 .play-pause-btn {
     background: #ff6f61;
     border: none;
     border-radius: 50%;
-    width: 50px;
-    height: 50px;
+    width: 50pt;
+    height: 50pt;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -211,7 +215,7 @@ label {
 
 .play-icon, .pause-icon {
     color: #ffffff;
-    font-size: 24px;
+    font-size: 24pt;
     display: none;
 }
 
@@ -220,13 +224,13 @@ label {
 }
 
 .seek-slider {
-    width: 200px;
-    margin: 0 10px;
+    width: 200pt;
+    margin: 0 10pt;
     cursor: pointer;
 }
 
 .current-time, .duration {
-    font-size: 14px;
+    font-size: 14pt;
     color: #333;
 }
 
@@ -234,19 +238,19 @@ label {
 
 .record {
     position: relative;
-    width: 300px;
-    height: 300px;
+    width: 300pt;
+    height: 300pt;
     border-radius: 50%;
     background-color: black;
     display: flex;
     justify-content: center;
     align-items: center;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 0 20pt rgba(0, 0, 0, 0.5);
 }
 .center-circle {
     position: absolute;
-    width: 100px;
-    height: 100px;
+    width: 100pt;
+    height: 100pt;
     background-color: #d97a00;
     border-radius: 50%;
     display: flex;
@@ -255,7 +259,7 @@ label {
     cursor: pointer;
 }
 .play-pause-icon {
-    font-size: 48px;
+    font-size: 48pt;
     color: white;
 }
 .text-container {
@@ -274,7 +278,7 @@ label {
     to { transform: translate(-50%, -50%) rotate(360deg); }
 }
 .time-container {
-    margin-top: 20px;
+    margin-top: 20pt;
     font-family: Arial, sans-serif;
     color: #333;
 }
