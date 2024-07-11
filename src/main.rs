@@ -58,7 +58,7 @@ pub struct RadioState {
 }
 /// Global async app state
 pub struct AppState {
-    pages: [&'static str; 4],
+    pages: [String; 4],
     to_blocking: tokio::sync::mpsc::UnboundedSender<ToBlocking>,
     radio_states: RwLock<HashMap<String, RwLock<RadioState>>>,
 }
@@ -77,9 +77,13 @@ async fn main() -> std::io::Result<()> {
         ])
         .await
         .into_iter()
-        .map(|s| s.map(|s| s.leak()))
         .collect::<Result<Box<_>, _>>()?;
-        [&*files[0], &*files[1], &*files[2], &*files[3]]
+        [
+            files[0].clone(),
+            files[1].clone(),
+            files[2].clone(),
+            files[3].clone(),
+        ]
     } else {
         [
             include_str!("../resources/start.html"),
@@ -87,12 +91,12 @@ async fn main() -> std::io::Result<()> {
             include_str!("../resources/edit.html"),
             include_str!("../resources/login.html"),
         ]
+        .map(|s| s.to_owned())
     }
     .map(|s| {
-        &*s.replace("./", "/reserved/")
+        s.replace("./", "/reserved/")
             .replace("start.html", "/")
             .replace("login.html", "/auth")
-            .leak()
     });
     // Create Channels for communication between blocking and async
     let (atx, arx) = unbounded_channel();

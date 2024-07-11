@@ -17,14 +17,43 @@ use tokio::sync::RwLock;
 #[get("/")]
 #[get("/index.html")]
 pub async fn get_start_page(state: web::Data<Arc<AppState>>) -> impl Responder {
-    HttpResponse::Ok().body(state.pages[0])
+    let mut page = state.pages[0].clone();
+    if let Some(start) = page.find("{radios}") {
+        if let Some(end) = page.find("{radios-end}") {
+            let snippet = (&page[start..end])
+                .to_owned()
+                .replace("{radios}", "")
+                .replace("{radios-end}", "");
+            let radio_states = state.radio_states.read().await;
+            let radios = radio_states
+                .iter()
+                .map(|(id, data)| async {
+                    let RadioState {
+                        config: Config { title, description },
+                        ..
+                    } = &*data.read().await;
+                    snippet
+                        .replace("{id}", id)
+                        .replace("{title}", title)
+                        .replace("{description}", description)
+                })
+                .collect::<Vec<_>>();
+            let mut radio_text = String::new();
+            for radio in radios {
+                let radio = radio.await;
+                radio_text.push_str(&radio);
+            }
+            page.replace_range(start..end, &radio_text);
+        }
+    }
+    HttpResponse::Ok().body(page.replace("{radios-end}", ""))
 }
 
 #[routes]
 #[get("/auth")]
 #[get("/auth/")]
 pub async fn get_auth_page(state: web::Data<Arc<AppState>>) -> impl Responder {
-    HttpResponse::Ok().body(state.pages[3])
+    HttpResponse::Ok().body(state.pages[3].clone())
 }
 
 #[routes]
