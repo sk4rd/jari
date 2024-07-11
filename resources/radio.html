@@ -1,15 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>{title}</title>
-  <!-- Font Awesome CSS -->
-  <link href="./fonts/font-awesome/css/fontawesome.css" rel="stylesheet" />
-  <link href="./fonts/font-awesome/css/solid.css" rel="stylesheet" />
-  <!-- External CSS -->
-  <link rel="stylesheet" href="css/index.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+    <!-- Font Awesome CSS -->
+    <link href="./fonts/font-awesome/css/fontawesome.css" rel="stylesheet" />
+    <link href="./fonts/font-awesome/css/solid.css" rel="stylesheet" />
+    <!-- External CSS -->
+    <link rel="stylesheet" href="./css/index.css" />
 
-  <script src="./js/radioplayer.js" defer></script>
-  <script src="./js/radio.js" defer></script>
+    <script src="./js/radioplayer.js" defer></script>
+    <script src="./js/radio.js" defer></script>
 </head>
 <body>
 <header class="header" style="background-color: rgb(100, 99, 99)">
@@ -40,34 +42,34 @@
   </button>
 </header>
 <div class="list-item2">
-  <img src="path/to/png" alt="PNG" />
-  <div class="content">
-    <span class="header-radio">Radio: {title}</span>
-    <br />
-    <span class="description-radio">{description}</span>
-  </div>
+    <img src="path/to/png" alt="PNG" />
+    <div class="content">
+        <span class="header-radio">Radio: {title}</span>
+        <br />
+        <span class="description-radio">{description}</span>
+    </div>
 </div>
 
 <div class="record">
-  <div class="text-container" id="textContainer">
-    <svg width="300" height="300">
-      <defs>
-        <path id="textPath" d="M 150,150 m -100,0 a 100,100 0 1,0 200,0 a 100,100 0 1,0 -200,0" />
-      </defs>
-      <text fill="white" font-size="24" font-family="Arial">
-        <textPath href="#textPath" startOffset="0">
-          JARI: {title}
-        </textPath>
-      </text>
-    </svg>
-  </div>
-  <div class="center-circle" id="playPauseButton">
-    <div class="play-pause-icon fa-solid fa-play"></div>
-  </div>
+    <div class="text-container" id="textContainer">
+        <svg width="300" height="300">
+            <defs>
+                <path id="textPath" d="M 150,150 m -100,0 a 100,100 0 1,0 200,0 a 100,100 0 1,0 -200,0" />
+            </defs>
+            <text fill="white" font-size="24" font-family="Arial">
+                <textPath href="#textPath" startOffset="0">
+                    JARI: {title}
+                </textPath>
+            </text>
+        </svg>
+    </div>
+    <div class="center-circle" id="playPauseButton">
+        <div class="play-pause-icon fa-solid fa-play"></div>
+    </div>
 </div>
 
 <div class="time-container">
-  <span id="currentTime">00:00</span> / <span id="totalTime">00:00</span>
+    <span id="currentTime">00:00</span> / <span id="totalTime">00:00</span>
 </div>
 
 <audio id="audio" src="deine-audio-datei.mp3"></audio>
