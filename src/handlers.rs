@@ -34,7 +34,7 @@ pub async fn get_auth_page(state: web::Data<Arc<AppState>>) -> impl Responder {
         state
             .pages
             .3
-            .replace("./", "/reserved")
+            .replace("./", "/reserved/")
             .replace("start.html", "/"),
     )
 }
