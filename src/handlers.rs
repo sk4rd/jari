@@ -17,14 +17,26 @@ use tokio::sync::RwLock;
 #[get("/")]
 #[get("/index.html")]
 pub async fn get_start_page(state: web::Data<Arc<AppState>>) -> impl Responder {
-    HttpResponse::Ok().body(state.pages.0)
+    HttpResponse::Ok().body(
+        state
+            .pages
+            .0
+            .replace("./", "/reserved/")
+            .replace("login.html", "/auth"),
+    )
 }
 
 #[routes]
 #[get("/auth")]
 #[get("/auth/")]
-pub async fn get_auth_page() -> impl Responder {
-    HttpResponse::Ok()
+pub async fn get_auth_page(state: web::Data<Arc<AppState>>) -> impl Responder {
+    HttpResponse::Ok().body(
+        state
+            .pages
+            .3
+            .replace("./", "/reserved")
+            .replace("start.html", "/"),
+    )
 }
 
 #[routes]
