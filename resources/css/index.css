@@ -4,8 +4,8 @@ body {
     padding: 0;
 }
 
-div {
-    margin: 3pt;
+main * {
+    margin: 1pt;
     box-sizing: border-box;
 }
 
