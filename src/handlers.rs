@@ -17,26 +17,14 @@ use tokio::sync::RwLock;
 #[get("/")]
 #[get("/index.html")]
 pub async fn get_start_page(state: web::Data<Arc<AppState>>) -> impl Responder {
-    HttpResponse::Ok().body(
-        state
-            .pages
-            .0
-            .replace("./", "/reserved/")
-            .replace("login.html", "/auth"),
-    )
+    HttpResponse::Ok().body(state.pages[0])
 }
 
 #[routes]
 #[get("/auth")]
 #[get("/auth/")]
 pub async fn get_auth_page(state: web::Data<Arc<AppState>>) -> impl Responder {
-    HttpResponse::Ok().body(
-        state
-            .pages
-            .3
-            .replace("./", "/reserved/")
-            .replace("start.html", "/"),
-    )
+    HttpResponse::Ok().body(state.pages[3])
 }
 
 #[routes]
@@ -61,15 +49,10 @@ pub async fn get_radio_page(
         .clone();
     // Return formatted data
     Ok(HttpResponse::Ok().body(
-        state
-            .pages
-            .1
+        state.pages[1]
             .replace("{title}", &title)
             .replace("{id}", &id)
-            .replace("{description}", &description)
-            .replace("./", "/reserved/")
-            .replace("start.html", "/")
-            .replace("login.html", "/auth"),
+            .replace("{description}", &description),
     ))
 }
 
@@ -93,16 +76,10 @@ pub async fn get_radio_edit_page(
         .config
         .clone();
     Ok(HttpResponse::Ok().body(
-        state
-            .pages
-            .2
+        state.pages[2]
             .replace("{title}", &title)
             .replace("{id}", &id)
-            .replace("{description}", &description)
-            .replace("./", "/reserved/")
-            .replace("radio.html", &format!("/{id}"))
-            .replace("start.html", "/")
-            .replace("login.html", "/auth"),
+            .replace("{description}", &description),
     ))
 }
 

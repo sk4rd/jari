@@ -58,7 +58,7 @@ pub struct RadioState {
 }
 /// Global async app state
 pub struct AppState {
-    pages: (&'static str, &'static str, &'static str, &'static str),
+    pages: [&'static str; 4],
     to_blocking: tokio::sync::mpsc::UnboundedSender<ToBlocking>,
     radio_states: RwLock<HashMap<String, RwLock<RadioState>>>,
 }
@@ -68,35 +68,32 @@ async fn main() -> std::io::Result<()> {
     let args = Args::parse();
     let port = args.port.unwrap_or(8080);
     let pages = if let Some(path) = args.pages {
-        // Get Pages from Files
-        let mut start_path = path.clone();
-        let mut radio_path = path.clone();
-        let mut edit_path = path.clone();
-        let mut auth_path = path.clone();
-        start_path.push("start.html");
-        radio_path.push("radio.html");
-        edit_path.push("edit.html");
-        auth_path.push("login.html");
         // Read all files
         let files = join_all([
-            read_to_string(start_path),
-            read_to_string(radio_path),
-            read_to_string(edit_path),
-            read_to_string(auth_path),
+            read_to_string(path.join("start.html")),
+            read_to_string(path.join("radio.html")),
+            read_to_string(path.join("edit.html")),
+            read_to_string(path.join("login.html")),
         ])
         .await
         .into_iter()
         .map(|s| s.map(|s| s.leak()))
         .collect::<Result<Box<_>, _>>()?;
-        (&*files[0], &*files[1], &*files[2], &*files[3])
+        [&*files[0], &*files[1], &*files[2], &*files[3]]
     } else {
-        (
+        [
             include_str!("../resources/start.html"),
             include_str!("../resources/radio.html"),
             include_str!("../resources/edit.html"),
             include_str!("../resources/login.html"),
-        )
-    };
+        ]
+    }
+    .map(|s| {
+        &*s.replace("./", "/reserved/")
+            .replace("start.html", "/")
+            .replace("login.html", "/auth")
+            .leak()
+    });
     // Create Channels for communication between blocking and async
     let (atx, arx) = unbounded_channel();
     let (stx, srx) = unbounded_channel();
