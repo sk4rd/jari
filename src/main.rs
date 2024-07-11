@@ -156,6 +156,7 @@ async fn main() -> std::io::Result<()> {
             App::new()
                 .app_data(web::Data::new(data.clone()))
                 .wrap(Compress::default())
+                .service(get_search_page)
                 .service(get_start_page)
                 .service(get_auth_page)
                 .service(get_radio_page)

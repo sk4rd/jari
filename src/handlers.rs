@@ -10,6 +10,7 @@ use actix_web::{
 };
 use futures::StreamExt;
 use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 
@@ -42,6 +43,58 @@ pub async fn get_start_page(state: web::Data<Arc<AppState>>) -> impl Responder {
             for radio in radios {
                 let radio = radio.await;
                 radio_text.push_str(&radio);
+            }
+            page.replace_range(start..end, &radio_text);
+        }
+    }
+    HttpResponse::Ok().body(page.replace("{radios-end}", ""))
+}
+
+#[derive(Serialize, Deserialize)]
+struct SearchQuery {
+    q: String,
+}
+#[routes]
+#[get("/search")]
+#[get("/search/")]
+pub async fn get_search_page(
+    query: web::Query<SearchQuery>,
+    state: web::Data<Arc<AppState>>,
+) -> impl Responder {
+    let query = query.into_inner().q;
+    let mut page = state.pages[0].clone();
+    if let Some(start) = page.find("{radios}") {
+        if let Some(end) = page.find("{radios-end}") {
+            let snippet = (&page[start..end])
+                .to_owned()
+                .replace("{radios}", "")
+                .replace("{radios-end}", "");
+            let radio_states = state.radio_states.read().await;
+            let radios = radio_states
+                .iter()
+                .map(|(id, data)| async {
+                    let RadioState {
+                        config: Config { title, description },
+                        ..
+                    } = &*data.read().await;
+                    if id.contains(&query) || title.contains(&query) || description.contains(&query)
+                    {
+                        Some(
+                            snippet
+                                .replace("{id}", id)
+                                .replace("{title}", title)
+                                .replace("{description}", description),
+                        )
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+            let mut radio_text = String::new();
+            for radio in radios {
+                if let Some(radio) = radio.await {
+                    radio_text.push_str(&radio);
+                }
             }
             page.replace_range(start..end, &radio_text);
         }
