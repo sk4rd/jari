@@ -1,0 +1,13 @@
+.input-ctrl-cont {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+}
+
+.ctrl {
+  margin-left: auto;
+}
+
+.input {
+  flex-basis: 100%;
+}
