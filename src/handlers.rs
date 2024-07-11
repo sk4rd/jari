@@ -35,13 +35,13 @@ pub async fn get_radio_page(
     path: web::Path<String>,
     state: web::Data<Arc<AppState>>,
 ) -> Result<HttpResponse, PageError> {
-    let name = path.into_inner();
+    let id = path.into_inner();
     // Extract Radio State
     let Config { title, description } = state
         .radio_states
         .read()
         .await
-        .get(&name)
+        .get(&id)
         .ok_or(PageError::NotFound)?
         .read()
         .await
@@ -53,8 +53,11 @@ pub async fn get_radio_page(
             .pages
             .1
             .replace("{title}", &title)
-            .replace("{name}", &name)
-            .replace("{description}", &description),
+            .replace("{id}", &id)
+            .replace("{description}", &description)
+            .replace("./", "/reserved/")
+            .replace("start.html", "/")
+            .replace("login.html", "/auth"),
     ))
 }
 
@@ -83,7 +86,11 @@ pub async fn get_radio_edit_page(
             .2
             .replace("{title}", &title)
             .replace("{id}", &id)
-            .replace("{description}", &description),
+            .replace("{description}", &description)
+            .replace("./", "/reserved/")
+            .replace("radio.html", &format!("/{id}"))
+            .replace("start.html", "/")
+            .replace("login.html", "/auth"),
     ))
 }
 
