@@ -31,6 +31,7 @@ mod hls;
 struct Args {
     port: Option<u16>,
     pages: Option<PathBuf>,
+    threads: Option<usize>,
 }
 
 const NUM_BANDWIDTHS: usize = 1;
@@ -63,133 +64,140 @@ pub struct AppState {
     radio_states: RwLock<HashMap<String, RwLock<RadioState>>>,
 }
 
-#[tokio::main]
-async fn main() -> std::io::Result<()> {
+fn main() -> std::io::Result<()> {
     let args = Args::parse();
     let port = args.port.unwrap_or(8080);
-    let pages = if let Some(path) = args.pages {
-        // Read all files
-        let files = join_all([
-            read_to_string(path.join("start.html")),
-            read_to_string(path.join("radio.html")),
-            read_to_string(path.join("edit.html")),
-            read_to_string(path.join("login.html")),
-        ])
-        .await
-        .into_iter()
-        .collect::<Result<Box<_>, _>>()?;
-        [
-            files[0].clone(),
-            files[1].clone(),
-            files[2].clone(),
-            files[3].clone(),
-        ]
-    } else {
-        [
-            include_str!("../resources/start.html"),
-            include_str!("../resources/radio.html"),
-            include_str!("../resources/edit.html"),
-            include_str!("../resources/login.html"),
-        ]
-        .map(|s| s.to_owned())
-    }
-    .map(|s| {
-        s.replace("./", "/reserved/")
-            .replace("start.html", "/")
-            .replace("login.html", "/auth")
-    });
-    // Create Channels for communication between blocking and async
-    let (atx, arx) = unbounded_channel();
-    let (stx, srx) = unbounded_channel();
-    // Create AppState
-    let data: Arc<AppState> = Arc::new(AppState {
-        pages,
-        to_blocking: stx,
-        radio_states: RwLock::new(HashMap::new()),
-    });
-    // Add test radio
-    data.radio_states.write().await.insert(
-        "test".to_owned(),
-        RwLock::new(RadioState {
-            config: Config {
-                title: "Test".to_owned(),
-                description: "This is a test station, \n ignore".to_owned(),
-            },
-            playlist: hls::MasterPlaylist::new([hls::MediaPlaylist::new([
-                hls::Segment::new(
-                    // NOTICE: This is a test segment taken from the Public Domain recording of Traditional American blues performed by Al Bernard & The Goofus Five year 1930
-                    Box::new(include_bytes!("segment.mp3").clone()),
-                ),
-                hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone())),
-            ])]),
-            song_map: HashMap::new(),
-            song_order: Vec::new(),
-        }),
-    );
+    let threads = args.threads.unwrap_or(5);
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(threads)
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let pages = if let Some(path) = args.pages {
+                // Read all files
+                let files = join_all([
+                    read_to_string(path.join("start.html")),
+                    read_to_string(path.join("radio.html")),
+                    read_to_string(path.join("edit.html")),
+                    read_to_string(path.join("login.html")),
+                ])
+                .await
+                .into_iter()
+                .collect::<Result<Box<_>, _>>()?;
+                [
+                    files[0].clone(),
+                    files[1].clone(),
+                    files[2].clone(),
+                    files[3].clone(),
+                ]
+            } else {
+                [
+                    include_str!("../resources/start.html"),
+                    include_str!("../resources/radio.html"),
+                    include_str!("../resources/edit.html"),
+                    include_str!("../resources/login.html"),
+                ]
+                .map(|s| s.to_owned())
+            }
+            .map(|s| {
+                s.replace("./", "/reserved/")
+                    .replace("start.html", "/")
+                    .replace("login.html", "/auth")
+            });
+            // Create Channels for communication between blocking and async
+            let (atx, arx) = unbounded_channel();
+            let (stx, srx) = unbounded_channel();
+            // Create AppState
+            let data: Arc<AppState> = Arc::new(AppState {
+                pages,
+                to_blocking: stx,
+                radio_states: RwLock::new(HashMap::new()),
+            });
+            // Add test radio
+            data.radio_states.write().await.insert(
+                "test".to_owned(),
+                RwLock::new(RadioState {
+                    config: Config {
+                        title: "Test".to_owned(),
+                        description: "This is a test station, \n ignore".to_owned(),
+                    },
+                    playlist: hls::MasterPlaylist::new([hls::MediaPlaylist::new([
+                        hls::Segment::new(
+                            // NOTICE: This is a test segment taken from the Public Domain recording of Traditional American blues performed by Al Bernard & The Goofus Five year 1930
+                            Box::new(include_bytes!("segment.mp3").clone()),
+                        ),
+                        hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone())),
+                    ])]),
+                    song_map: HashMap::new(),
+                    song_order: Vec::new(),
+                }),
+            );
 
-    let mut blocking_radio_map = HashMap::new();
-    blocking_radio_map.extend(
-        data.radio_states
-            .read()
-            .await
-            .iter()
-            .map(|(name, _state)| (name.clone(), vec![])), // TODO: get order from file
-    );
+            let mut blocking_radio_map = HashMap::new();
+            blocking_radio_map.extend(
+                data.radio_states
+                    .read()
+                    .await
+                    .iter()
+                    .map(|(name, _state)| (name.clone(), vec![])), // TODO: get order from file
+            );
 
-    let song_data_dir = PathBuf::from("./data");
+            let song_data_dir = PathBuf::from("./data");
 
-    // Start blocking thread
-    std::thread::spawn(|| {
-        blocking::main(
-            atx,
-            srx,
-            Duration::from_secs(10),
-            blocking_radio_map,
-            song_data_dir,
-        )
-    });
+            // Start blocking thread
+            std::thread::spawn(|| {
+                blocking::main(
+                    atx,
+                    srx,
+                    Duration::from_secs(10),
+                    blocking_radio_map,
+                    song_data_dir,
+                )
+            });
 
-    // Start web server task
-    let server = {
-        let data = data.clone();
-        HttpServer::new(move || {
-            App::new()
-                .app_data(web::Data::new(data.clone()))
-                .wrap(Compress::default())
-                .service(get_search_page)
-                .service(get_start_page)
-                .service(get_auth_page)
-                .service(get_radio_page)
-                .service(get_radio_edit_page)
-                .service(set_radio_config)
-                .service(add_radio)
-                .service(upload_song)
-                .service(get_song_order)
-                .service(set_song_order)
-                .service(remove_radio)
-                .service(remove_song)
-                .service(hls::get_master)
-                .service(hls::get_media)
-                .service(hls::get_segment)
-                .service(Files::new("/reserved", "./resources").prefer_utf8(true))
+            // Start web server task
+            let server = {
+                let data = data.clone();
+                HttpServer::new(move || {
+                    App::new()
+                        .app_data(web::Data::new(data.clone()))
+                        .wrap(Compress::default())
+                        .service(get_search_page)
+                        .service(get_start_page)
+                        .service(get_auth_page)
+                        .service(get_radio_page)
+                        .service(get_radio_edit_page)
+                        .service(set_radio_config)
+                        .service(add_radio)
+                        .service(upload_song)
+                        .service(get_song_order)
+                        .service(set_song_order)
+                        .service(remove_radio)
+                        .service(remove_song)
+                        .service(hls::get_master)
+                        .service(hls::get_media)
+                        .service(hls::get_segment)
+                        .service(Files::new("/reserved", "./resources").prefer_utf8(true))
+                })
+                .bind(("0.0.0.0", port))?
+                .run()
+            };
+
+            // Start HLS worker task
+            let hls = {
+                let data = data.clone();
+                tokio::task::spawn(
+                    UnboundedReceiverStream::new(arx)
+                        .then(move |frame| hls::update(frame.0, frame.1, data.clone()))
+                        .collect::<()>(),
+                )
+            };
+            // Run all tasks (until one finishes)
+            // NOTE: Only use Futures that only finish on unrecoverable errors (but we still want to exit gracefully)
+            select! {
+            x = server => return x,
+            _ = hls => unreachable!()
+            }
         })
-        .bind(("0.0.0.0", port))?
-        .run()
-    };
-
-    // Start HLS worker task
-    let hls = {
-        let data = data.clone();
-        tokio::task::spawn(
-            UnboundedReceiverStream::new(arx)
-                .then(move |frame| hls::update(frame.0, frame.1, data.clone()))
-                .collect::<()>(),
-        )
-    };
-    // Run all tasks (until one finishes)
-    // NOTE: Only use Futures that only finish on unrecoverable errors (but we still want to exit gracefully)
-    select! {
-    x = server => return x,
-    _ = hls => unreachable!()
-    }
 }
