@@ -42,7 +42,12 @@ pub enum ToBlocking {
     AddRadio { radio: String },
 }
 
-fn decode_loop(mut format: Box<dyn FormatReader>, mut decoder: Box<dyn Decoder>, track_id: u32) {
+fn decode_loop(
+    mut format: Box<dyn FormatReader>,
+    mut decoder: Box<dyn Decoder>,
+    track_id: u32,
+    path: PathBuf,
+) {
     use symphonia::core::errors::Error;
 
     let mut pcm = vec![];
@@ -140,8 +145,8 @@ fn decode_loop(mut format: Box<dyn FormatReader>, mut decoder: Box<dyn Decoder>,
                 break 'encode;
             }
         }
-        eprintln!("Saving part {i} with {}B data", compressed.len());
-        // TODO: save audio
+        let mut path = path.clone().join(format!("{i}.aac"));
+        std::fs::write(path, compressed).unwrap();
     }
 }
 /// The blocking thread, contains mainly audio processing
@@ -177,8 +182,8 @@ pub fn main(
                         data,
                     } => {
                         // TODO(blocking): enable returning errors to user
-                        let Ok(()) = create_dir(root_dir.join(&radio).join(song.to_string()))
-                        else {
+                        let path = root_dir.join(&radio).join(song.to_string());
+                        let Ok(()) = create_dir(&path) else {
                             eprintln!("Couldn't create dir for song {song} in radio {radio} with root {}!", root_dir.display());
                             break 'mesg_check;
                         };
@@ -235,7 +240,7 @@ pub fn main(
 
                         // Store the track identifier, it will be used to filter packets.
                         let track_id = track.id;
-                        std::thread::spawn(move || decode_loop(format, decoder, track_id));
+                        std::thread::spawn(move || decode_loop(format, decoder, track_id, path));
                     }
                     ToBlocking::Order { radio, order } => {
                         let Some(radio_lock) = radios.get_mut(&radio) else {
