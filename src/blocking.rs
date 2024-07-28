@@ -120,11 +120,11 @@ fn decode_loop(
     }
     let num_channels = channels.count().clamp(0, 2);
     let each_len = rate as usize * 10 * num_channels;
-    for (i, mut part) in pcm.chunks(each_len).enumerate() {
+    for (i, part) in pcm.chunks(each_len).enumerate() {
         let encoder = fdk_aac::enc::Encoder::new(EncoderParams {
             bit_rate: fdk_aac::enc::BitRate::VbrVeryHigh,
             sample_rate: rate,
-            transport: fdk_aac::enc::Transport::Raw,
+            transport: fdk_aac::enc::Transport::Adts,
             channels: if num_channels == 2 {
                 ChannelMode::Stereo
             } else {
@@ -132,19 +132,35 @@ fn decode_loop(
             },
         })
         .unwrap();
-        let mut compressed = Vec::<u8>::with_capacity(200000);
-        'encode: loop {
-            let mut comp_part = [0; 10000];
+        let encoder_info = encoder.info().unwrap();
+
+        let samples_per_chunk = 2 * encoder_info.frameLength as usize;
+
+        let mut compressed = Vec::<u8>::new();
+
+        let mut buf: [u8; 1536] = [0; 1536];
+
+        // This is necessary because otherwise the encoder would output two frames of silence
+        encoder
+            .encode(&part[0..samples_per_chunk.clamp(0, part.len())], &mut buf)
+            .unwrap();
+        encoder
+            .encode(
+                &part[samples_per_chunk.clamp(0, part.len())
+                    ..(samples_per_chunk * 2).clamp(0, part.len())],
+                &mut buf,
+            )
+            .unwrap();
+
+        for chunk in part.chunks(samples_per_chunk) {
             let EncodeInfo {
                 input_consumed,
                 output_size,
-            } = encoder.encode(part, &mut comp_part).unwrap();
-            part = &part[input_consumed..];
-            compressed.extend_from_slice(&comp_part[..output_size]);
-            if part.len() == 0 {
-                break 'encode;
-            }
+            } = encoder.encode(chunk, &mut buf).unwrap();
+            compressed.extend_from_slice(&buf[..output_size]);
         }
+
+        // Save file
         let mut path = path.clone().join(format!("{i}.aac"));
         std::fs::write(path, compressed).unwrap();
     }
