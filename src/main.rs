@@ -38,7 +38,7 @@ struct Args {
 }
 
 const NUM_BANDWIDTHS: usize = 1;
-const NUM_SEGMENTS: usize = 2;
+const NUM_SEGMENTS: usize = 4;
 
 const BANDWIDTHS: [usize; NUM_BANDWIDTHS] = [22000];
 /// Radio Config sent by the frontend
@@ -134,6 +134,8 @@ fn main() -> std::io::Result<()> {
                             // NOTICE: This is a test segment taken from the Public Domain recording of Traditional American blues performed by Al Bernard & The Goofus Five year 1930
                             Box::new(include_bytes!("segment.mp3").clone()),
                         ),
+                        hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone())),
+                        hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone())),
                         hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone())),
                     ])]),
                     song_map: HashMap::new(),
