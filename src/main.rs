@@ -67,7 +67,11 @@ pub struct AppState {
 fn main() -> std::io::Result<()> {
     let args = Args::parse();
     let port = args.port.unwrap_or(8080);
-    let threads = args.threads.unwrap_or(5);
+    let threads = args.threads.unwrap_or_else(|| {
+        std::thread::available_parallelism()
+            .map(|v| v.into())
+            .unwrap_or(6)
+    });
     tokio::runtime::Builder::new_multi_thread()
         .worker_threads(threads)
         .enable_all()
