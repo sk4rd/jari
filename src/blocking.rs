@@ -179,7 +179,7 @@ pub fn main(
     // PANICKING: Since 10 != 0 and x - x / 10000 == x * 0.9999 >= 0 for Duration x which by Typedefinition is >= 0, this should never panic
     // TODO(optimize): if the above proof is correct, we can unwrap_unchecked (unsafe)
     let short_interval = interval
-        .checked_sub(interval.checked_div(10000).unwrap())
+        .checked_sub(interval.checked_div(2).unwrap())
         .unwrap();
     let codecs = get_codecs();
     let mut last = std::time::Instant::now();
@@ -203,7 +203,6 @@ pub fn main(
                             eprintln!("Couldn't create dir for song {song} in radio {radio} with root {}!", root_dir.display());
                             break 'mesg_check;
                         };
-                        // TODO(audio): save songs (batching)
                         // get extension hint
                         ext.retain(|c| c != '.');
                         let mut hint = Hint::new();

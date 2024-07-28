@@ -197,7 +197,7 @@ pub async fn update(
     audio: Vec<(String, [Segment; crate::NUM_BANDWIDTHS])>,
     data: Arc<AppState>,
 ) {
-    // TODO: Update the HLS data on to instant
+    tokio::time::sleep_until(instant.checked_sub(Duration::from_millis(5)).unwrap()).await;
     for (id, segments) in audio {
         let radio_states = data.radio_states.read().await;
         let Some(state) = radio_states.get(&id) else {
