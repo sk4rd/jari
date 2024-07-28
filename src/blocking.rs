@@ -1,12 +1,15 @@
 use std::{
     collections::HashMap,
     fs::{create_dir, remove_dir_all},
+    io::Cursor,
     path::PathBuf,
     time::Duration,
 };
 
+use fdk_aac::enc::{ChannelMode, EncodeInfo, EncoderParams};
 use symphonia::{
     core::{
+        audio::{Channels, RawSampleBuffer, SampleBuffer, Signal, SignalSpec},
         codecs::{CodecParameters, CodecType, Decoder, DecoderOptions, CODEC_TYPE_NULL},
         formats::{FormatOptions, FormatReader},
         io::MediaSourceStream,
@@ -41,6 +44,9 @@ pub enum ToBlocking {
 
 fn decode_loop(mut format: Box<dyn FormatReader>, mut decoder: Box<dyn Decoder>, track_id: u32) {
     use symphonia::core::errors::Error;
+
+    let mut pcm = vec![];
+    let mut spec = None;
     // The decode loop.
     loop {
         // Get the next packet from the media format.
@@ -54,8 +60,13 @@ fn decode_loop(mut format: Box<dyn FormatReader>, mut decoder: Box<dyn Decoder>,
                 unimplemented!();
             }
             Err(err) => {
+                if let Error::IoError(ref err) = err {
+                    if err.kind() == std::io::ErrorKind::UnexpectedEof {
+                        break;
+                    }
+                }
                 // A unrecoverable error occurred, halt decoding.
-                panic!("{}", err);
+                panic!("Error reading packet: {:?}", err);
             }
         };
 
@@ -74,8 +85,15 @@ fn decode_loop(mut format: Box<dyn FormatReader>, mut decoder: Box<dyn Decoder>,
 
         // Decode the packet into audio samples.
         match decoder.decode(&packet) {
-            Ok(_decoded) => {
+            Ok(decoded) => {
                 // Consume the decoded audio samples (see below).
+
+                spec = Some(decoded.spec().clone());
+                let mut sample_buf = SampleBuffer::new(decoded.capacity() as u64, *decoded.spec());
+
+                sample_buf.copy_interleaved_ref(decoded);
+
+                pcm.extend_from_slice(sample_buf.samples());
             }
             Err(Error::IoError(_)) => {
                 // The packet failed to decode due to an IO error, skip the packet.
@@ -87,9 +105,43 @@ fn decode_loop(mut format: Box<dyn FormatReader>, mut decoder: Box<dyn Decoder>,
             }
             Err(err) => {
                 // An unrecoverable error occurred, halt decoding.
-                panic!("{}", err);
+                panic!("B: {}", err);
             }
         }
+    }
+    let SignalSpec { rate, channels } = spec.unwrap();
+    if channels.count() > 2 {
+        todo!("Discard other channels");
+    }
+    let num_channels = channels.count().clamp(0, 2);
+    let each_len = rate as usize * 10 * num_channels;
+    for (i, mut part) in pcm.chunks(each_len).enumerate() {
+        let encoder = fdk_aac::enc::Encoder::new(EncoderParams {
+            bit_rate: fdk_aac::enc::BitRate::VbrVeryHigh,
+            sample_rate: rate,
+            transport: fdk_aac::enc::Transport::Raw,
+            channels: if num_channels == 2 {
+                ChannelMode::Stereo
+            } else {
+                ChannelMode::Mono
+            },
+        })
+        .unwrap();
+        let mut compressed = Vec::<u8>::with_capacity(200000);
+        'encode: loop {
+            let mut comp_part = [0; 10000];
+            let EncodeInfo {
+                input_consumed,
+                output_size,
+            } = encoder.encode(part, &mut comp_part).unwrap();
+            part = &part[input_consumed..];
+            compressed.extend_from_slice(&comp_part[..output_size]);
+            if part.len() == 0 {
+                break 'encode;
+            }
+        }
+        eprintln!("Saving part {i} with {}B data", compressed.len());
+        // TODO: save audio
     }
 }
 /// The blocking thread, contains mainly audio processing
@@ -136,41 +188,54 @@ pub fn main(
                         let mut hint = Hint::new();
                         hint.with_extension(&ext);
 
-                        let mss = MediaSourceStream::new(todo!(), Default::default());
+                        let mss =
+                            MediaSourceStream::new(Box::new(Cursor::new(data)), Default::default());
 
                         // Use the default options for metadata and format readers.
                         let meta_opts: MetadataOptions = Default::default();
                         let fmt_opts: FormatOptions = Default::default();
 
                         // Probe the media source.
-                        let Ok(probed) = symphonia::default::get_probe()
+                        let probed = match symphonia::default::get_probe()
                             .format(&hint, mss, &fmt_opts, &meta_opts)
-                        else {
-                            eprintln!("Got data of unsupported codec");
-                            break 'mesg_check;
+                        {
+                            Ok(probed) => probed,
+                            Err(e) => {
+                                eprintln!("Got data of unsupported codec. Err: {e}");
+                                break 'mesg_check;
+                            }
                         };
 
                         // Get the instantiated format reader.
                         let mut format = probed.format;
 
                         // Find the first audio track with a known (decodeable) codec.
-                        let track = format
+                        let Some(track) = format
                             .tracks()
                             .iter()
                             .find(|t| t.codec_params.codec != CODEC_TYPE_NULL)
-                            .expect("no supported audio tracks");
+                        else {
+                            eprintln!("No supported audio track!");
+                            break 'mesg_check;
+                        };
 
                         // Use the default options for the decoder.
                         let dec_opts: DecoderOptions = Default::default();
 
                         // Create a decoder for the track.
-                        let mut decoder = symphonia::default::get_codecs()
+                        let mut decoder = match symphonia::default::get_codecs()
                             .make(&track.codec_params, &dec_opts)
-                            .expect("unsupported codec");
+                        {
+                            Ok(decoder) => decoder,
+                            Err(e) => {
+                                eprintln!("Unsupported codec (2)! Err: {e}");
+                                break 'mesg_check;
+                            }
+                        };
 
                         // Store the track identifier, it will be used to filter packets.
                         let track_id = track.id;
-                        std::thread::spawn(|| decode_loop(format, decoder, track_id));
+                        std::thread::spawn(move || decode_loop(format, decoder, track_id));
                     }
                     ToBlocking::Order { radio, order } => {
                         let Some(radio_lock) = radios.get_mut(&radio) else {
