@@ -29,8 +29,11 @@ mod hls;
 #[derive(Parser, Debug)]
 #[command(version, about)]
 struct Args {
+    #[arg(short, long)]
     port: Option<u16>,
+    #[arg(short = 'P', long)]
     pages: Option<PathBuf>,
+    #[arg(short, long)]
     threads: Option<usize>,
 }
 
