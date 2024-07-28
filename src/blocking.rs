@@ -38,10 +38,16 @@ pub fn main(
     mut radios: HashMap<String, Vec<u8>>,
     root_dir: PathBuf,
 ) {
+    // PANICKING: Since 10 != 0 and x - x / 10000 == x * 0.9999 >= 0 for Duration x which by Typedefinition is >= 0, this should never panic
+    // TODO(optimize): if the above proof is correct, we can unwrap_unchecked (unsafe)
+    let short_interval = interval
+        .checked_sub(interval.checked_div(10000).unwrap())
+        .unwrap();
     let mut last = std::time::Instant::now();
     let _start = last.clone();
     let seg = Segment::new(Box::new(include_bytes!("segment2.mp3").clone()));
     loop {
+        let mut recvd = true;
         // Check for messages
         'mesg_check: {
             match srx.try_recv() {
@@ -94,13 +100,13 @@ pub fn main(
                         };
                     }
                 },
-                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {}
+                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => recvd = false,
                 Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return,
             }
         }
         // Check if interval has been reached
         let diff = last.elapsed();
-        if diff > interval {
+        if diff > short_interval {
             // TODO: send/create next fragment
             last += interval;
             atx.send((
@@ -108,6 +114,10 @@ pub fn main(
                 vec![("test".to_string(), [seg.clone()])],
             ))
             .unwrap();
+        } else {
+            if !recvd {
+                std::thread::sleep(Duration::from_micros(1));
+            }
         }
     }
 }
