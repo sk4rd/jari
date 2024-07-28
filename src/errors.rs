@@ -13,6 +13,8 @@ pub enum PageError {
     MultipartError,
     #[display(fmt = "Resource doesn't exist")]
     ResourceNotFound,
+    #[display(fmt = "File type is unsupported")]
+    UnsupportedFileType,
 }
 
 impl ResponseError for PageError {
@@ -22,6 +24,7 @@ impl ResponseError for PageError {
             PageError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
             PageError::MultipartError => StatusCode::BAD_REQUEST,
             PageError::ResourceNotFound => StatusCode::BAD_REQUEST,
+            PageError::UnsupportedFileType => StatusCode::BAD_REQUEST,
         }
     }
 }

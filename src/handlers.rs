@@ -267,6 +267,7 @@ pub async fn upload_song(
         .send(ToBlocking::Upload {
             radio: radio_id.clone(),
             song: id,
+            ext: song_id[song_id.rfind('.').ok_or(PageError::UnsupportedFileType)?..].to_owned(),
             data: song_data.into_boxed_slice(),
         })
         .map_err(PageError::from)?;
