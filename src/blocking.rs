@@ -1,12 +1,14 @@
 use std::{
     collections::HashMap,
-    fs::{create_dir, remove_dir_all},
+    fs::{create_dir, read_dir, remove_dir_all},
     io::Cursor,
+    ops::AddAssign,
     path::PathBuf,
     time::Duration,
 };
 
 use fdk_aac::enc::{ChannelMode, EncodeInfo, EncoderParams};
+use rayon::iter::{IntoParallelRefIterator, ParallelBridge, ParallelIterator};
 use symphonia::{
     core::{
         audio::{Channels, RawSampleBuffer, SampleBuffer, Signal, SignalSpec},
@@ -120,6 +122,7 @@ fn decode_loop(
     }
     let num_channels = channels.count().clamp(0, 2);
     let each_len = rate as usize * 10 * num_channels;
+    let total_secs = pcm.len() as f64 / (rate as f64 * num_channels as f64);
     for (i, part) in pcm.chunks(each_len).enumerate() {
         let encoder = fdk_aac::enc::Encoder::new(EncoderParams {
             bit_rate: fdk_aac::enc::BitRate::VbrVeryHigh,
@@ -164,6 +167,7 @@ fn decode_loop(
         let mut path = path.clone().join(format!("{i}.aac"));
         std::fs::write(path, compressed).unwrap();
     }
+    std::fs::write(path.join("len"), total_secs.to_string()).unwrap();
 }
 /// The blocking thread, contains mainly audio processing
 pub fn main(
@@ -184,7 +188,7 @@ pub fn main(
     let codecs = get_codecs();
     let mut last = std::time::Instant::now();
     let _start = last.clone();
-    let seg = Segment::new(Box::new(include_bytes!("segment2.mp3").clone()));
+    let seg = Segment::new(Box::new(include_bytes!("segment2.mp3").clone()), 10.0);
     loop {
         let mut recvd = true;
         // Check for messages
@@ -305,12 +309,34 @@ pub fn main(
         let diff = last.elapsed();
         if diff > short_interval {
             // TODO: send/create next fragment
+            let segments = radios
+                .iter()
+                .par_bridge()
+                .map(|(name, order)| {
+                    let name = name.clone();
+                    let Some(song) = order.get(0) else {
+                        return (name, Default::default());
+                    };
+                    let path = root_dir.join(&name).join(song.to_string());
+                    let Ok(Ok(len)): Result<Result<f64, _>, _> =
+                        std::fs::read_to_string(path.join("len")).map(|v| v.parse())
+                    else {
+                        eprintln!("Couldn't get len for song {song} in radio {name}");
+                        return (name, Default::default());
+                    };
+                    let seg = ((_start.elapsed().as_secs_f64() % len) / 10.0) as usize;
+                    let Ok(data) = std::fs::read(path.join(seg.to_string()).with_extension("aac"))
+                    else {
+                        eprintln!("Couldn't read song file {seg} of song {song} in radio {name}");
+                        return (name, Default::default());
+                    };
+                    let secs = (len - seg as f64 * 10.0).clamp(0.0, 10.0);
+                    eprintln!("Serving segment {seg} of song {song} in radio {name} len {secs}s");
+                    (name, [Segment::new(data.into_boxed_slice(), secs)])
+                })
+                .collect();
             last += interval;
-            atx.send((
-                last.clone().into(),
-                vec![("test".to_string(), [seg.clone()])],
-            ))
-            .unwrap();
+            atx.send((last.clone().into(), segments)).unwrap();
         } else {
             if !recvd {
                 std::thread::sleep(Duration::from_micros(1));

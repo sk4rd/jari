@@ -133,10 +133,11 @@ fn main() -> std::io::Result<()> {
                         hls::Segment::new(
                             // NOTICE: This is a test segment taken from the Public Domain recording of Traditional American blues performed by Al Bernard & The Goofus Five year 1930
                             Box::new(include_bytes!("segment.mp3").clone()),
+                            10.0,
                         ),
-                        hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone())),
-                        hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone())),
-                        hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone())),
+                        hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone()), 10.0),
+                        hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone()), 10.0),
+                        hls::Segment::new(Box::new(include_bytes!("segment2.mp3").clone()), 10.0),
                     ])]),
                     song_map: HashMap::new(),
                     song_order: Vec::new(),

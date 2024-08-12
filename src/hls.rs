@@ -38,7 +38,7 @@ impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
         let playlist_descrs = bandwidths.iter().map(|bandwidth| {
             format!(
                 "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"{bandwidth}\",NAME=\"{bandwidth}\",AUTOSELECT=YES,DEFAULT=YES,AUTOSELECT=YES
-#EXT-X-STREAM-INF:BANDWIDTH={bandwidth},CODECS=\"mp3\"
+#EXT-X-STREAM-INF:BANDWIDTH={bandwidth},CODECS=\"aac\"
 {base_path}{bandwidth}/playlist.m3u8"
             )
         });
@@ -97,13 +97,13 @@ impl<const S: usize> MediaPlaylist<S> {
     }
     /// Add a Segment dropping the oldest
     pub fn add_segment(&mut self, segment: Segment) {
-        let i = if self.current_index < S - 1 {
+        self.current_index = if self.current_index < S - 1 {
             self.current_index + 1
         } else {
             0
         };
         self.current += 1;
-        self.segments[i] = segment;
+        self.segments[self.current_index] = segment;
     }
     /// Get the ith segment processed with tags
     pub fn get_segment_raw(&self, i: usize) -> Option<Box<[u8]>> {
@@ -142,7 +142,7 @@ impl<const S: usize> MediaPlaylist<S> {
         let segment_descrs = (start..=self.current).map(|i| {
             format!(
                 "#EXTINF:10.000,
-{i}.mp3"
+{i}.aac"
             )
         });
         format!(
@@ -172,14 +172,18 @@ impl<const S: usize> Default for MediaPlaylist<S> {
 #[derive(Debug, Clone)]
 pub struct Segment {
     raw: Box<[u8]>,
+    secs: f64,
 }
 
 impl Segment {
     pub fn get_raw(&self) -> Box<[u8]> {
         self.raw.clone()
     }
-    pub const fn new(raw: Box<[u8]>) -> Self {
-        Self { raw }
+    pub fn secs(&self) -> f64 {
+        self.secs
+    }
+    pub const fn new(raw: Box<[u8]>, secs: f64) -> Self {
+        Self { raw, secs }
     }
 }
 
@@ -187,6 +191,7 @@ impl Default for Segment {
     fn default() -> Self {
         Self {
             raw: Box::new(include_bytes!("silence.mp3").clone()),
+            secs: 10.0,
         }
     }
 }
@@ -199,6 +204,7 @@ pub async fn update(
 ) {
     tokio::time::sleep_until(instant.checked_sub(Duration::from_millis(5)).unwrap()).await;
     for (id, segments) in audio {
+        eprintln!("Updating {id}");
         let radio_states = data.radio_states.read().await;
         let Some(state) = radio_states.get(&id) else {
             eprintln!("Mismatched State! {id} was sent by blocking, but is not in appstate");
@@ -266,7 +272,7 @@ pub async fn get_media(
 }
 
 #[routes]
-#[get("/{radio}/listen/{bandwidth}/{segment}.mp3")]
+#[get("/{radio}/listen/{bandwidth}/{segment}.aac")]
 pub async fn get_segment(
     path: web::Path<(String, usize, usize)>,
     state: web::Data<Arc<AppState>>,
