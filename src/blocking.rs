@@ -188,7 +188,6 @@ pub fn main(
     let codecs = get_codecs();
     let mut last = std::time::Instant::now();
     let _start = last.clone();
-    let seg = Segment::new(Box::new(include_bytes!("segment2.mp3").clone()), 10.0);
     loop {
         let mut recvd = true;
         // Check for messages

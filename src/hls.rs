@@ -190,7 +190,7 @@ impl Segment {
 impl Default for Segment {
     fn default() -> Self {
         Self {
-            raw: Box::new(include_bytes!("silence.mp3").clone()),
+            raw: Box::new(include_bytes!("silence.aac").clone()),
             secs: 10.0,
         }
     }
