@@ -308,22 +308,41 @@ pub fn main(
         let diff = last.elapsed();
         if diff > short_interval {
             // TODO: send/create next fragment
+            let time_s = _start.elapsed().as_secs_f64();
             let segments = radios
                 .iter()
                 .par_bridge()
                 .map(|(name, order)| {
                     let name = name.clone();
-                    let Some(song) = order.get(0) else {
-                        return (name, Default::default());
-                    };
-                    let path = root_dir.join(&name).join(song.to_string());
-                    let Ok(Ok(len)): Result<Result<f64, _>, _> =
-                        std::fs::read_to_string(path.join("len")).map(|v| v.parse())
+                    let path = root_dir.join(&name);
+                    let lens: Box<[(u8, f64)]> = order
+                        .iter()
+                        .filter_map(|song| {
+                            std::fs::read_to_string(path.join(song.to_string()).join("len"))
+                                .ok()
+                                .and_then(|v| v.parse().map(|x| (*song, x)).ok())
+                                .ok_or(())
+                                .map_err(|_| {
+                                    eprintln!("Couldn't get len for song {song} in radio {name}")
+                                })
+                                .ok()
+                        })
+                        .collect();
+                    let total_len: f64 = lens.iter().map(|(_, len)| len).sum();
+                    let time = time_s % total_len;
+                    let Some((song, offset, len)) = lens
+                        .into_iter()
+                        .scan(0.0f64, |pre_len, (song, len)| {
+                            *pre_len += len;
+                            Some((song, *pre_len, len))
+                        })
+                        .find(|(_, offset, _)| *offset >= time)
                     else {
-                        eprintln!("Couldn't get len for song {song} in radio {name}");
                         return (name, Default::default());
                     };
-                    let seg = ((_start.elapsed().as_secs_f64() % len) / 10.0) as usize;
+                    let time = time - (offset - len);
+                    let path = root_dir.join(&name).join(song.to_string());
+                    let seg = (time / 10.0) as usize;
                     let Ok(data) = std::fs::read(path.join(seg.to_string()).with_extension("aac"))
                     else {
                         eprintln!("Couldn't read song file {seg} of song {song} in radio {name}");
@@ -331,7 +350,7 @@ pub fn main(
                     };
                     let secs = (len - seg as f64 * 10.0).clamp(0.0, 10.0);
                     eprintln!("Serving segment {seg} of song {song} in radio {name} len {secs}s");
-                    (name, [Segment::new(data.into_boxed_slice(), secs)])
+                    return (name, [Segment::new(data.into_boxed_slice(), secs)]);
                 })
                 .collect();
             last += interval;
