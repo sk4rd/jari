@@ -218,6 +218,7 @@ pub async fn update(
 
 #[routes]
 #[get("/{radio}/listen/master.m3u8")]
+#[get("/{radio}/listen")]
 pub async fn get_master(
     path: web::Path<String>,
     state: web::Data<Arc<AppState>>,
