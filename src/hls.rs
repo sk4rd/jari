@@ -140,9 +140,16 @@ impl<const S: usize> MediaPlaylist<S> {
         // TODO: Confirm/Test this
         let start = self.current.saturating_sub(S - 2);
         let segment_descrs = (start..=self.current).map(|i| {
+            let index = self.current - i;
+            let len = self.segments[if self.current_index >= index {
+                self.current_index - index
+            } else {
+                self.current_index + S - index
+            }]
+            .secs();
             format!(
-                "#EXTINF:10.000,
-{i}.aac"
+                "#EXTINF:{len:.3},
+{i}.aac",
             )
         });
         format!(
