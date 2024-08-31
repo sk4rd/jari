@@ -7,7 +7,7 @@ use actix_web::{
 use clap::{Parser, Subcommand};
 use futures::{future::join_all, io::BufReader, join, StreamExt};
 use itertools::Itertools;
-use rustls::{internal::msgs::codec::Codec, Certificate, PrivateKey, ServerConfig};
+use rustls::{pki_types::PrivateKeyDer, ServerConfig};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tokio::{
@@ -198,23 +198,15 @@ fn main() -> std::io::Result<()> {
                         use std::io::BufReader;
                         let (cert, key) = (File::open(cert), File::open(key));
                         let (mut cert, mut key) = (BufReader::new(cert?), BufReader::new(key?));
-                        let cert_chain = rustls_pemfile::certs(&mut cert)?
-                            .into_iter()
-                            .map(|buf| {
-                                Certificate::read_bytes(&buf)
-                                    .ok_or(std::io::Error::other("Invalid Cert"))
-                            })
-                            .try_collect()?;
+                        let cert_chain = rustls_pemfile::certs(&mut cert).try_collect()?;
 
-                        let key = rustls_pemfile::pkcs8_private_keys(&mut key)?
-                            .into_iter()
-                            .map(PrivateKey)
+                        let key = rustls_pemfile::pkcs8_private_keys(&mut key)
+                            .map(|key| key.map(PrivateKeyDer::Pkcs8))
                             .next()
-                            .ok_or(std::io::Error::other("No keys"))?;
-                        server.bind_rustls(
-                            "0.0.0.0",
+                            .ok_or(std::io::Error::other("No keys"))??;
+                        server.bind_rustls_0_23(
+                            "0.0.0.0:8080",
                             ServerConfig::builder()
-                                .with_safe_defaults()
                                 .with_no_client_auth()
                                 .with_single_cert(cert_chain, key)
                                 .expect("Invalid Tls Cert/Key"),
@@ -229,23 +221,15 @@ fn main() -> std::io::Result<()> {
                             use std::io::BufReader;
                             let (cert, key) = (File::open(cert), File::open(key));
                             let (mut cert, mut key) = (BufReader::new(cert?), BufReader::new(key?));
-                            let cert_chain = rustls_pemfile::certs(&mut cert)?
-                                .into_iter()
-                                .map(|buf| {
-                                    Certificate::read_bytes(&buf)
-                                        .ok_or(std::io::Error::other("Invalid Cert"))
-                                })
-                                .try_collect()?;
+                            let cert_chain = rustls_pemfile::certs(&mut cert).try_collect()?;
 
-                            let key = rustls_pemfile::pkcs8_private_keys(&mut key)?
-                                .into_iter()
-                                .map(PrivateKey)
+                            let key = rustls_pemfile::pkcs8_private_keys(&mut key)
+                                .map(|key| key.map(PrivateKeyDer::Pkcs8))
                                 .next()
-                                .ok_or(std::io::Error::other("No keys"))?;
-                            server.bind_rustls(
-                                "0.0.0.0",
+                                .ok_or(std::io::Error::other("No keys"))??;
+                            server.bind_rustls_0_23(
+                                "0.0.0.0:8080",
                                 ServerConfig::builder()
-                                    .with_safe_defaults()
                                     .with_no_client_auth()
                                     .with_single_cert(cert_chain, key)
                                     .expect("Invalid Tls Cert/Key"),
