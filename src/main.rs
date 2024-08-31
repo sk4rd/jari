@@ -4,12 +4,14 @@ use actix_web::{
     web::{self},
     App, HttpServer, Result,
 };
-use clap::Parser;
-use futures::{future::join_all, StreamExt};
+use clap::{Parser, Subcommand};
+use futures::{future::join_all, io::BufReader, join, StreamExt};
+use itertools::Itertools;
+use rustls::{internal::msgs::codec::Codec, Certificate, PrivateKey, ServerConfig};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tokio::{
-    fs::read_to_string,
+    fs::{read_to_string, File},
     select,
     sync::{mpsc::unbounded_channel, RwLock},
     time::Duration,
@@ -28,6 +30,7 @@ mod hls;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
+#[command(propagate_version = true)]
 struct Args {
     #[arg(short, long)]
     port: Option<u16>,
@@ -35,6 +38,13 @@ struct Args {
     pages: Option<PathBuf>,
     #[arg(short, long)]
     threads: Option<usize>,
+    #[command(subcommand)]
+    tls: Option<TlsArgs>,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+enum TlsArgs {
+    Files { cert: PathBuf, key: PathBuf },
 }
 
 const NUM_BANDWIDTHS: usize = 1;
@@ -75,6 +85,7 @@ fn main() -> std::io::Result<()> {
             .map(|v| v.into())
             .unwrap_or(6)
     });
+    let tls_opts = args.tls;
     tokio::runtime::Builder::new_multi_thread()
         .worker_threads(threads)
         .enable_all()
@@ -91,7 +102,7 @@ fn main() -> std::io::Result<()> {
                 ])
                 .await
                 .into_iter()
-                .collect::<Result<Box<_>, _>>()?;
+                .collect::<Result<Box<[String]>, _>>()?;
                 [
                     files[0].clone(),
                     files[1].clone(),
@@ -160,7 +171,7 @@ fn main() -> std::io::Result<()> {
             // Start web server task
             let server = {
                 let data = data.clone();
-                HttpServer::new(move || {
+                let server = HttpServer::new(move || {
                     App::new()
                         .app_data(web::Data::new(data.clone()))
                         .wrap(Compress::default())
@@ -180,8 +191,37 @@ fn main() -> std::io::Result<()> {
                         .service(hls::get_media)
                         .service(hls::get_segment)
                         .service(Files::new("/reserved", "./resources").prefer_utf8(true))
-                })
-                .bind(("0.0.0.0", port))?
+                });
+                match tls_opts {
+                    Some(TlsArgs::Files { cert, key }) => {
+                        use std::fs::File;
+                        use std::io::BufReader;
+                        let (cert, key) = (File::open(cert), File::open(key));
+                        let (mut cert, mut key) = (BufReader::new(cert?), BufReader::new(key?));
+                        let cert_chain = rustls_pemfile::certs(&mut cert)?
+                            .into_iter()
+                            .map(|buf| {
+                                Certificate::read_bytes(&buf)
+                                    .ok_or(std::io::Error::other("Invalid Cert"))
+                            })
+                            .try_collect()?;
+
+                        let key = rustls_pemfile::pkcs8_private_keys(&mut key)?
+                            .into_iter()
+                            .map(PrivateKey)
+                            .next()
+                            .ok_or(std::io::Error::other("No keys"))?;
+                        server.bind_rustls(
+                            "0.0.0.0",
+                            ServerConfig::builder()
+                                .with_safe_defaults()
+                                .with_no_client_auth()
+                                .with_single_cert(cert_chain, key)
+                                .expect("Invalid Tls Cert/Key"),
+                        )?
+                    }
+                    None => server.bind(("0.0.0.0", port))?,
+                }
                 .run()
             };
 
