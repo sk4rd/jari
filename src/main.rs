@@ -205,7 +205,7 @@ fn main() -> std::io::Result<()> {
                             .next()
                             .ok_or(std::io::Error::other("No keys"))??;
                         server.bind_rustls_0_23(
-                            "0.0.0.0:8080",
+                            ("0.0.0.0", port),
                             ServerConfig::builder()
                                 .with_no_client_auth()
                                 .with_single_cert(cert_chain, key)
@@ -228,7 +228,7 @@ fn main() -> std::io::Result<()> {
                                 .next()
                                 .ok_or(std::io::Error::other("No keys"))??;
                             server.bind_rustls_0_23(
-                                "0.0.0.0:8080",
+                                ("0.0.0.0", port),
                                 ServerConfig::builder()
                                     .with_no_client_auth()
                                     .with_single_cert(cert_chain, key)
