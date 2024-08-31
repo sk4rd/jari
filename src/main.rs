@@ -220,7 +220,40 @@ fn main() -> std::io::Result<()> {
                                 .expect("Invalid Tls Cert/Key"),
                         )?
                     }
-                    None => server.bind(("0.0.0.0", port))?,
+                    None => {
+                        if let (Some((_, cert)), Some((_, key))) = (
+                            std::env::vars().find(|(name, _)| name == "SSL_CERT_FILE"),
+                            std::env::vars().find(|(name, _)| name == "SSL_KEY_FILE"),
+                        ) {
+                            use std::fs::File;
+                            use std::io::BufReader;
+                            let (cert, key) = (File::open(cert), File::open(key));
+                            let (mut cert, mut key) = (BufReader::new(cert?), BufReader::new(key?));
+                            let cert_chain = rustls_pemfile::certs(&mut cert)?
+                                .into_iter()
+                                .map(|buf| {
+                                    Certificate::read_bytes(&buf)
+                                        .ok_or(std::io::Error::other("Invalid Cert"))
+                                })
+                                .try_collect()?;
+
+                            let key = rustls_pemfile::pkcs8_private_keys(&mut key)?
+                                .into_iter()
+                                .map(PrivateKey)
+                                .next()
+                                .ok_or(std::io::Error::other("No keys"))?;
+                            server.bind_rustls(
+                                "0.0.0.0",
+                                ServerConfig::builder()
+                                    .with_safe_defaults()
+                                    .with_no_client_auth()
+                                    .with_single_cert(cert_chain, key)
+                                    .expect("Invalid Tls Cert/Key"),
+                            )?
+                        } else {
+                            server.bind(("0.0.0.0", port))?
+                        }
+                    }
                 }
                 .run()
             };
