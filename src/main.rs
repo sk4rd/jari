@@ -6,7 +6,8 @@ use actix_web::{
 };
 use ammonia::clean;
 use clap::{Parser, Subcommand};
-use futures::{future::join_all, StreamExt};
+use futures::{future::join_all, FutureExt, StreamExt, TryFutureExt};
+use hls::MasterPlaylist;
 use itertools::Itertools;
 use rustls::{pki_types::PrivateKeyDer, ServerConfig};
 use serde::{Deserialize, Serialize};
@@ -113,12 +114,24 @@ pub struct RadioState {
     song_map: HashMap<String, u8>,
     song_order: Vec<String>,
 }
+/// Serializable Data for saving radio state
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PersistentRadioState {
+    config: SentConfig,
+    song_map: HashMap<String, u8>,
+    song_order: Vec<String>,
+}
 /// Global async app state
 #[derive(Debug)]
 pub struct AppState {
     pages: [String; 4],
     to_blocking: tokio::sync::mpsc::UnboundedSender<ToBlocking>,
     radio_states: RwLock<HashMap<String, RwLock<RadioState>>>,
+}
+/// Serializeble app state
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PersistentAppState {
+    radio_states: HashMap<String, PersistentRadioState>,
 }
 
 fn main() -> std::io::Result<()> {
@@ -176,39 +189,53 @@ fn main() -> std::io::Result<()> {
                 to_blocking: stx,
                 radio_states: RwLock::new(HashMap::new()),
             });
-            // Add test radio
-            data.radio_states.write().await.insert(
-                "test".to_owned(),
-                RwLock::new(RadioState {
-                    config: Config {
-                        title: "Test".into(),
-                        description: "This is a test station, \n ignore".into(),
-                    },
-                    playlist: hls::MasterPlaylist::default(),
-                    song_map: HashMap::new(),
-                    song_order: Vec::new(),
-                }),
-            );
 
+            let data_dir = PathBuf::from("./data");
+            // Load radio state
             let mut blocking_radio_map = HashMap::new();
-            blocking_radio_map.extend(
-                data.radio_states
-                    .read()
-                    .await
-                    .iter()
-                    .map(|(name, _state)| (name.clone(), vec![])), // TODO: get order from file
-            );
-
-            let song_data_dir = PathBuf::from("./data");
+            if let Ok(state_file) = tokio::fs::read(data_dir.join("state")).await {
+                let loaded_state: PersistentAppState =
+                    postcard::from_bytes(&state_file).expect("State file has invalid data!");
+                for (
+                    name,
+                    PersistentRadioState {
+                        config,
+                        song_map,
+                        song_order,
+                    },
+                ) in loaded_state.radio_states.into_iter()
+                {
+                    blocking_radio_map.insert(
+                        name.clone(),
+                        song_order
+                            .iter()
+                            .filter_map(|song| song_map.get(song).copied())
+                            .collect(),
+                    );
+                    data.radio_states.write().await.insert(
+                        name,
+                        RwLock::new(RadioState {
+                            config: Config {
+                                title: config.title.into(),
+                                description: config.description.into(),
+                            },
+                            playlist: MasterPlaylist::default(),
+                            song_map,
+                            song_order,
+                        }),
+                    );
+                }
+            }
 
             // Start blocking thread
+            let blocking_data_dir = data_dir.clone();
             std::thread::spawn(|| {
                 blocking::main(
                     atx,
                     srx,
                     Duration::from_secs(10),
                     blocking_radio_map,
-                    song_data_dir,
+                    blocking_data_dir,
                 )
             });
 
@@ -280,9 +307,39 @@ fn main() -> std::io::Result<()> {
             };
             // Run all tasks (until one finishes)
             // NOTE: Only use Futures that only finish on unrecoverable errors (but we still want to exit gracefully)
-            select! {
-            x = server => return x,
+            let res = select! {
+            x = server => x,
             _ = hls => unreachable!()
+            };
+            // Save radio states
+            let mut radio_states = data.radio_states.write().await;
+            let mut persistent_radio_states = HashMap::new();
+            for (name, radio_state) in radio_states.iter_mut() {
+                let RadioState {
+                    config,
+                    playlist: _,
+                    song_map,
+                    song_order,
+                } = radio_state.get_mut().clone();
+                persistent_radio_states.insert(
+                    name.clone(),
+                    PersistentRadioState {
+                        config: SentConfig {
+                            title: config.title.into(),
+                            description: config.description.into(),
+                        },
+                        song_map,
+                        song_order,
+                    },
+                );
             }
+            let state = PersistentAppState {
+                radio_states: persistent_radio_states,
+            };
+            let state_buf = postcard::to_allocvec(&state).unwrap();
+            tokio::fs::write(data_dir.join("state"), state_buf)
+                .await
+                .unwrap();
+            res
         })
 }
