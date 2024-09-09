@@ -236,8 +236,16 @@ fn main() -> std::io::Result<()> {
                         .service(hls::get_segment)
                         .service(Files::new("/reserved", "./resources").prefer_utf8(true))
                 });
-                match tls_opts {
-                    Some(TlsArgs::Files { cert, key }) => {
+                let tls_env = (
+                    std::env::vars()
+                        .find(|(name, _)| name == "SSL_CERT_FILE")
+                        .map(|v| PathBuf::from(v.1)),
+                    std::env::vars()
+                        .find(|(name, _)| name == "SSL_KEY_FILE")
+                        .map(|v| PathBuf::from(v.1)),
+                );
+                match (tls_opts, tls_env) {
+                    (Some(TlsArgs::Files { cert, key }), _) | (_, (Some(cert), Some(key))) => {
                         use std::fs::File;
                         use std::io::BufReader;
                         let (cert, key) = (File::open(cert), File::open(key));
@@ -256,32 +264,7 @@ fn main() -> std::io::Result<()> {
                                 .expect("Invalid Tls Cert/Key"),
                         )?
                     }
-                    None => {
-                        if let (Some((_, cert)), Some((_, key))) = (
-                            std::env::vars().find(|(name, _)| name == "SSL_CERT_FILE"),
-                            std::env::vars().find(|(name, _)| name == "SSL_KEY_FILE"),
-                        ) {
-                            use std::fs::File;
-                            use std::io::BufReader;
-                            let (cert, key) = (File::open(cert), File::open(key));
-                            let (mut cert, mut key) = (BufReader::new(cert?), BufReader::new(key?));
-                            let cert_chain = rustls_pemfile::certs(&mut cert).try_collect()?;
-
-                            let key = rustls_pemfile::pkcs8_private_keys(&mut key)
-                                .map(|key| key.map(PrivateKeyDer::Pkcs8))
-                                .next()
-                                .ok_or(std::io::Error::other("No keys"))??;
-                            server.bind_rustls_0_23(
-                                ("0.0.0.0", port),
-                                ServerConfig::builder()
-                                    .with_no_client_auth()
-                                    .with_single_cert(cert_chain, key)
-                                    .expect("Invalid Tls Cert/Key"),
-                            )?
-                        } else {
-                            server.bind(("0.0.0.0", port))?
-                        }
-                    }
+                    _ => server.bind(("0.0.0.0", port))?,
                 }
                 .run()
             };
