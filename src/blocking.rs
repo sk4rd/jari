@@ -1,24 +1,20 @@
 use std::{
     collections::HashMap,
-    fs::{create_dir, read_dir, remove_dir_all},
+    fs::{create_dir, remove_dir_all},
     io::Cursor,
-    ops::AddAssign,
     path::PathBuf,
     time::Duration,
 };
 
 use fdk_aac::enc::{ChannelMode, EncodeInfo, EncoderParams};
-use rayon::iter::{IntoParallelRefIterator, ParallelBridge, ParallelIterator};
-use symphonia::{
-    core::{
-        audio::{Channels, RawSampleBuffer, SampleBuffer, Signal, SignalSpec},
-        codecs::{CodecParameters, CodecType, Decoder, DecoderOptions, CODEC_TYPE_NULL},
-        formats::{FormatOptions, FormatReader},
-        io::MediaSourceStream,
-        meta::MetadataOptions,
-        probe::Hint,
-    },
-    default::get_codecs,
+use rayon::iter::{ParallelBridge, ParallelIterator};
+use symphonia::core::{
+    audio::{SampleBuffer, SignalSpec},
+    codecs::{Decoder, DecoderOptions, CODEC_TYPE_NULL},
+    formats::{FormatOptions, FormatReader},
+    io::MediaSourceStream,
+    meta::MetadataOptions,
+    probe::Hint,
 };
 use tokio::time::Instant;
 
@@ -157,14 +153,14 @@ fn decode_loop(
 
         for chunk in part.chunks(samples_per_chunk) {
             let EncodeInfo {
-                input_consumed,
+                input_consumed: _,
                 output_size,
             } = encoder.encode(chunk, &mut buf).unwrap();
             compressed.extend_from_slice(&buf[..output_size]);
         }
 
         // Save file
-        let mut path = path.clone().join(format!("{i}.aac"));
+        let path = path.clone().join(format!("{i}.aac"));
         std::fs::write(path, compressed).unwrap();
     }
     std::fs::write(path.join("len"), total_secs.to_string()).unwrap();
@@ -185,7 +181,6 @@ pub fn main(
     let short_interval = interval
         .checked_sub(interval.checked_div(2).unwrap())
         .unwrap();
-    let codecs = get_codecs();
     let mut last = std::time::Instant::now();
     let _start = last.clone();
     loop {
@@ -230,7 +225,7 @@ pub fn main(
                         };
 
                         // Get the instantiated format reader.
-                        let mut format = probed.format;
+                        let format = probed.format;
 
                         // Find the first audio track with a known (decodeable) codec.
                         let Some(track) = format
@@ -246,7 +241,7 @@ pub fn main(
                         let dec_opts: DecoderOptions = Default::default();
 
                         // Create a decoder for the track.
-                        let mut decoder = match symphonia::default::get_codecs()
+                        let decoder = match symphonia::default::get_codecs()
                             .make(&track.codec_params, &dec_opts)
                         {
                             Ok(decoder) => decoder,

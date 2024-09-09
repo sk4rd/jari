@@ -6,13 +6,13 @@ use actix_web::{
 };
 use ammonia::clean;
 use clap::{Parser, Subcommand};
-use futures::{future::join_all, io::BufReader, join, StreamExt};
+use futures::{future::join_all, StreamExt};
 use itertools::Itertools;
 use rustls::{pki_types::PrivateKeyDer, ServerConfig};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::Deref, path::PathBuf, sync::Arc};
 use tokio::{
-    fs::{read_to_string, File},
+    fs::read_to_string,
     select,
     sync::{mpsc::unbounded_channel, RwLock},
     time::Duration,
