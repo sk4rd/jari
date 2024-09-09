@@ -4,12 +4,13 @@ use actix_web::{
     web::{self},
     App, HttpServer, Result,
 };
+use ammonia::clean;
 use clap::{Parser, Subcommand};
 use futures::{future::join_all, io::BufReader, join, StreamExt};
 use itertools::Itertools;
 use rustls::{pki_types::PrivateKeyDer, ServerConfig};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, ops::Deref, path::PathBuf, sync::Arc};
 use tokio::{
     fs::{read_to_string, File},
     select,
@@ -47,16 +48,58 @@ enum TlsArgs {
     Files { cert: PathBuf, key: PathBuf },
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct CleanString(String);
+
+impl From<String> for CleanString {
+    fn from(value: String) -> Self {
+        Self(clean(&value))
+    }
+}
+impl From<&String> for CleanString {
+    fn from(value: &String) -> Self {
+        Self(clean(value))
+    }
+}
+impl From<&str> for CleanString {
+    fn from(value: &str) -> Self {
+        Self(clean(value))
+    }
+}
+impl Into<String> for CleanString {
+    fn into(self) -> String {
+        self.0
+    }
+}
+impl AsRef<str> for CleanString {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+impl Deref for CleanString {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 const NUM_BANDWIDTHS: usize = 1;
 const NUM_SEGMENTS: usize = 4;
 
 const BANDWIDTHS: [usize; NUM_BANDWIDTHS] = [22000];
-/// Radio Config sent by the frontend
-#[derive(Debug, Clone, Deserialize, Serialize)]
+/// Radio Config
+#[derive(Debug, Clone)]
 pub struct Config {
+    title: CleanString,
+    description: CleanString,
+}
+/// Radio Config from frontend (not cleaned)
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SentConfig {
     title: String,
     description: String,
 }
+/// Partial Radio config from Frontend (not cleaned)
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PartialConfig {
     title: Option<String>,
@@ -71,6 +114,7 @@ pub struct RadioState {
     song_order: Vec<String>,
 }
 /// Global async app state
+#[derive(Debug)]
 pub struct AppState {
     pages: [String; 4],
     to_blocking: tokio::sync::mpsc::UnboundedSender<ToBlocking>,
@@ -137,8 +181,8 @@ fn main() -> std::io::Result<()> {
                 "test".to_owned(),
                 RwLock::new(RadioState {
                     config: Config {
-                        title: "Test".to_owned(),
-                        description: "This is a test station, \n ignore".to_owned(),
+                        title: "Test".into(),
+                        description: "This is a test station, \n ignore".into(),
                     },
                     playlist: hls::MasterPlaylist::default(),
                     song_map: HashMap::new(),

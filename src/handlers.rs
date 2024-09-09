@@ -1,7 +1,7 @@
 use crate::blocking::ToBlocking;
 use crate::errors::PageError;
 use crate::hls::MasterPlaylist;
-use crate::{AppState, Config, PartialConfig, RadioState};
+use crate::{AppState, Config, PartialConfig, RadioState, SentConfig};
 use actix_multipart::Multipart;
 use actix_web::{
     delete, put, routes,
@@ -179,22 +179,22 @@ pub async fn set_radio_config(
 
     let mut radio_state_locked = radio_state.write().await;
     if let Some(title) = &partial_config.title {
-        radio_state_locked.config.title = title.clone();
+        radio_state_locked.config.title = title.into();
     }
     if let Some(description) = &partial_config.description {
-        radio_state_locked.config.description = description.clone();
+        radio_state_locked.config.description = description.into();
     }
 
     Ok(HttpResponse::Ok().body(format!(
         "Edited {id} with title: {}",
-        radio_state_locked.config.title
+        &*radio_state_locked.config.title
     )))
 }
 
 #[put("/{radio}")]
 pub async fn add_radio(
     path: web::Path<String>,
-    web::Json(config): web::Json<Config>,
+    web::Json(config): web::Json<SentConfig>,
     state: web::Data<Arc<AppState>>,
 ) -> Result<HttpResponse, PageError> {
     let id = path.into_inner();
@@ -205,7 +205,10 @@ pub async fn add_radio(
     }
 
     let new_radio_state = RadioState {
-        config,
+        config: Config {
+            title: config.title.into(),
+            description: config.description.into(),
+        },
         playlist: MasterPlaylist::default(),
         song_map: HashMap::new(),
         song_order: Vec::new(),
