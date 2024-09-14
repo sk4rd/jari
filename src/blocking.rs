@@ -344,7 +344,7 @@ pub fn main(
                         return (name, Default::default());
                     };
                     let secs = (len - seg as f64 * 10.0).clamp(0.0, 10.0);
-                    eprintln!("Serving segment {seg} of song {song} in radio {name} len {secs}s");
+                    // eprintln!("Serving segment {seg} of song {song} in radio {name} len {secs}s");
                     let Ok(segs) = recode(data) else {
                         eprintln!(
                             "Recoding error for segment {seg} of song {song} in radio {name}"
@@ -390,8 +390,8 @@ fn recode(data: Vec<u8>) -> Result<[Box<[u8]>; NUM_BANDWIDTHS], RecodeError> {
     decoder.decode_frame(&mut frame).unwrap();
     let frame_size = decoder.decoded_frame_size();
     let stream_info = decoder.stream_info();
-    eprintln!("setting up encoders");
-    dbg!(stream_info.sampleRate);
+    // eprintln!("setting up encoders");
+    // dbg!(stream_info.sampleRate);
     let mut encoders = BANDWIDTHS.map(|band| {
         Encoder::new(EncoderParams {
             bit_rate: BitRate::Cbr(band as u32),
@@ -413,7 +413,7 @@ fn recode(data: Vec<u8>) -> Result<[Box<[u8]>; NUM_BANDWIDTHS], RecodeError> {
         } = encoder.encode(&frame[..frame_size], &mut buf)?;
         segs[i].extend_from_slice(&buf[..output_size]);
     }
-    eprintln!("starting decode-encode loop");
+    // eprintln!("starting decode-encode loop");
     loop {
         let mut frame = vec![0; frame_size];
         decoder.decode_frame(&mut frame)?;
