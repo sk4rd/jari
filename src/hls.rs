@@ -37,7 +37,7 @@ impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
         // Format the metadata for each playlist/bandwidth
         let playlist_descrs = bandwidths.iter().map(|bandwidth| {
             format!(
-                "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"{bandwidth}\",NAME=\"{bandwidth}\",AUTOSELECT=YES,DEFAULT=YES,AUTOSELECT=YES
+                "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"{bandwidth}\",NAME=\"{bandwidth}\",AUTOSELECT=YES,DEFAULT=YES
 #EXT-X-STREAM-INF:BANDWIDTH={bandwidth},CODECS=\"aac\"
 {base_path}{bandwidth}/playlist.m3u8"
             )
@@ -119,7 +119,7 @@ impl<const S: usize> MediaPlaylist<S> {
         .get_raw()
         .into_vec();
 
-        let timestamp = (i as u64) * 900000 * 10 * (1 + S as u64);
+        let timestamp = (i as u64) * 18000 * 10 * (1 + S as u64);
         let mut time_vec = Vec::new();
         time_vec
             .write_u64::<byteorder::BigEndian>(timestamp)

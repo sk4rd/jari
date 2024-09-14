@@ -119,37 +119,36 @@ fn decode_loop(
     let num_channels = channels.count().clamp(0, 2);
     let each_len = rate as usize * 10 * num_channels;
     let total_secs = pcm.len() as f64 / (rate as f64 * num_channels as f64);
-    for (i, part) in pcm.chunks(each_len).enumerate() {
-        let encoder = fdk_aac::enc::Encoder::new(EncoderParams {
-            bit_rate: fdk_aac::enc::BitRate::VbrVeryHigh,
-            sample_rate: rate,
-            transport: fdk_aac::enc::Transport::Adts,
-            channels: if num_channels == 2 {
-                ChannelMode::Stereo
-            } else {
-                ChannelMode::Mono
-            },
-        })
+    let encoder = fdk_aac::enc::Encoder::new(EncoderParams {
+        bit_rate: fdk_aac::enc::BitRate::VbrVeryHigh,
+        sample_rate: rate,
+        transport: fdk_aac::enc::Transport::Adts,
+        channels: if num_channels == 2 {
+            ChannelMode::Stereo
+        } else {
+            ChannelMode::Mono
+        },
+    })
+    .unwrap();
+    let encoder_info = encoder.info().unwrap();
+
+    let samples_per_chunk = 2 * encoder_info.frameLength as usize;
+
+    let mut buf: [u8; 1536] = [0; 1536];
+
+    // This is necessary because otherwise the encoder would output two frames of silence
+    encoder
+        .encode(&pcm[0..samples_per_chunk.clamp(0, pcm.len())], &mut buf)
         .unwrap();
-        let encoder_info = encoder.info().unwrap();
-
-        let samples_per_chunk = 2 * encoder_info.frameLength as usize;
-
+    encoder
+        .encode(
+            &pcm[samples_per_chunk.clamp(0, pcm.len())
+                ..(samples_per_chunk * 2).clamp(0, pcm.len())],
+            &mut buf,
+        )
+        .unwrap();
+    for (i, part) in pcm.chunks(each_len).enumerate() {
         let mut compressed = Vec::<u8>::new();
-
-        let mut buf: [u8; 1536] = [0; 1536];
-
-        // This is necessary because otherwise the encoder would output two frames of silence
-        encoder
-            .encode(&part[0..samples_per_chunk.clamp(0, part.len())], &mut buf)
-            .unwrap();
-        encoder
-            .encode(
-                &part[samples_per_chunk.clamp(0, part.len())
-                    ..(samples_per_chunk * 2).clamp(0, part.len())],
-                &mut buf,
-            )
-            .unwrap();
 
         for chunk in part.chunks(samples_per_chunk) {
             let EncodeInfo {
@@ -406,7 +405,23 @@ fn recode(data: Vec<u8>) -> Result<[Box<[u8]>; NUM_BANDWIDTHS], RecodeError> {
         .unwrap()
     });
     for (i, encoder) in encoders.iter().enumerate() {
-        let mut buf = [0; 1536];
+        let encoder_info = encoder.info().unwrap();
+
+        let samples_per_chunk = 2 * encoder_info.frameLength as usize;
+
+        let mut buf: [u8; 1536] = [0; 1536];
+
+        // This is necessary because otherwise the encoder would output two frames of silence
+        encoder
+            .encode(&frame[0..samples_per_chunk.clamp(0, frame.len())], &mut buf)
+            .unwrap();
+        encoder
+            .encode(
+                &frame[samples_per_chunk.clamp(0, frame.len())
+                    ..(samples_per_chunk * 2).clamp(0, frame.len())],
+                &mut buf,
+            )
+            .unwrap();
         let EncodeInfo {
             input_consumed: _,
             output_size,
@@ -415,6 +430,7 @@ fn recode(data: Vec<u8>) -> Result<[Box<[u8]>; NUM_BANDWIDTHS], RecodeError> {
     }
     // eprintln!("starting decode-encode loop");
     loop {
+        // TODO(audio): make decoding somehow work
         let mut frame = vec![0; frame_size];
         decoder.decode_frame(&mut frame)?;
         for (i, encoder) in encoders.iter_mut().enumerate() {
@@ -430,6 +446,25 @@ fn recode(data: Vec<u8>) -> Result<[Box<[u8]>; NUM_BANDWIDTHS], RecodeError> {
         }
         let consumed = decoder.fill(data)?;
         data = &data[consumed..];
+    }
+    for (i, encoder) in encoders.iter_mut().enumerate() {
+        let encoder_info = encoder.info().unwrap();
+
+        let samples_per_chunk = 2 * encoder_info.frameLength as usize;
+
+        let mut buf: [u8; 1536] = [0; 1536];
+
+        let empty_part = vec![0; samples_per_chunk];
+        let EncodeInfo {
+            input_consumed: _,
+            output_size,
+        } = encoder.encode(&empty_part, &mut buf).unwrap();
+        segs[i].extend_from_slice(&buf[..output_size]);
+        let EncodeInfo {
+            input_consumed: _,
+            output_size,
+        } = encoder.encode(&empty_part, &mut buf).unwrap();
+        segs[i].extend_from_slice(&buf[..output_size]);
     }
     Ok(segs.map(|seg| seg.into_boxed_slice()))
 }
