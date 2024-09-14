@@ -18,7 +18,7 @@ use symphonia::core::{
 };
 use tokio::time::Instant;
 
-use crate::hls::Segment;
+use crate::{hls::Segment, BANDWIDTHS, NUM_BANDWIDTHS};
 
 /// Messages, that can be sent to the blocking thread (mainly audio)
 #[derive(Debug, Clone)]
@@ -345,7 +345,13 @@ pub fn main(
                     };
                     let secs = (len - seg as f64 * 10.0).clamp(0.0, 10.0);
                     eprintln!("Serving segment {seg} of song {song} in radio {name} len {secs}s");
-                    return (name, [Segment::new(data.into_boxed_slice(), secs)]);
+                    let Ok(segs) = recode(data) else {
+                        eprintln!(
+                            "Recoding error for segment {seg} of song {song} in radio {name}"
+                        );
+                        return (name, Default::default());
+                    };
+                    return (name, segs.map(|seg| Segment::new(seg, secs)));
                 })
                 .collect();
             last += interval;
@@ -356,4 +362,74 @@ pub fn main(
             }
         }
     }
+}
+
+pub enum RecodeError {
+    DecodeError(fdk_aac::dec::DecoderError),
+    EncodeError(fdk_aac::enc::EncoderError),
+}
+impl From<fdk_aac::dec::DecoderError> for RecodeError {
+    fn from(value: fdk_aac::dec::DecoderError) -> Self {
+        Self::DecodeError(value)
+    }
+}
+impl From<fdk_aac::enc::EncoderError> for RecodeError {
+    fn from(value: fdk_aac::enc::EncoderError) -> Self {
+        Self::EncodeError(value)
+    }
+}
+
+fn recode(data: Vec<u8>) -> Result<[Box<[u8]>; NUM_BANDWIDTHS], RecodeError> {
+    use fdk_aac::dec::*;
+    use fdk_aac::enc::*;
+    let mut segs = [(); NUM_BANDWIDTHS].map(|_| vec![]);
+    let mut decoder = Decoder::new(fdk_aac::dec::Transport::Adts);
+    let consumed = decoder.fill(&data)?;
+    let mut data = &data[consumed..];
+    let mut frame = [0; 2048];
+    decoder.decode_frame(&mut frame).unwrap();
+    let frame_size = decoder.decoded_frame_size();
+    let stream_info = decoder.stream_info();
+    eprintln!("setting up encoders");
+    dbg!(stream_info.sampleRate);
+    let mut encoders = BANDWIDTHS.map(|band| {
+        Encoder::new(EncoderParams {
+            bit_rate: BitRate::Cbr(band as u32),
+            sample_rate: stream_info.sampleRate as u32,
+            transport: fdk_aac::enc::Transport::Adts,
+            channels: if stream_info.numChannels == 2 {
+                ChannelMode::Stereo
+            } else {
+                ChannelMode::Mono
+            },
+        })
+        .unwrap()
+    });
+    for (i, encoder) in encoders.iter().enumerate() {
+        let mut buf = [0; 1536];
+        let EncodeInfo {
+            input_consumed: _,
+            output_size,
+        } = encoder.encode(&frame[..frame_size], &mut buf)?;
+        segs[i].extend_from_slice(&buf[..output_size]);
+    }
+    eprintln!("starting decode-encode loop");
+    loop {
+        let mut frame = vec![0; frame_size];
+        decoder.decode_frame(&mut frame)?;
+        for (i, encoder) in encoders.iter_mut().enumerate() {
+            let mut buf: [u8; 1536] = [0; 1536];
+            let EncodeInfo {
+                input_consumed: _,
+                output_size,
+            } = encoder.encode(&frame, &mut buf)?;
+            segs[i].extend_from_slice(&buf[..output_size]);
+        }
+        if data.len() == 0 {
+            break;
+        }
+        let consumed = decoder.fill(data)?;
+        data = &data[consumed..];
+    }
+    Ok(segs.map(|seg| seg.into_boxed_slice()))
 }

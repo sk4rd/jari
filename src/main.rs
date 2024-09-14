@@ -84,10 +84,10 @@ impl Deref for CleanString {
     }
 }
 
-const NUM_BANDWIDTHS: usize = 1;
+const NUM_BANDWIDTHS: usize = 4;
 const NUM_SEGMENTS: usize = 4;
 
-const BANDWIDTHS: [usize; NUM_BANDWIDTHS] = [22000];
+const BANDWIDTHS: [usize; NUM_BANDWIDTHS] = [128000, 96000, 48000, 24000];
 /// Radio Config
 #[derive(Debug, Clone)]
 pub struct Config {
