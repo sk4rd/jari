@@ -1,5 +1,4 @@
 use std::{
-    borrow::Borrow,
     collections::HashMap,
     fs::{create_dir, remove_dir_all},
     io::Cursor,
@@ -173,7 +172,7 @@ pub fn main(
     )>,
     mut srx: tokio::sync::mpsc::UnboundedReceiver<ToBlocking>,
     interval: Duration,
-    mut radios: HashMap<String, Vec<u8>>,
+    radios: HashMap<String, Vec<u8>>,
     root_dir: PathBuf,
 ) {
     // PANICKING: Since 10 != 0 and x - x / 10000 == x * 0.9999 >= 0 for Duration x which by Typedefinition is >= 0, this should never panic

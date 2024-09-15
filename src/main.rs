@@ -6,7 +6,7 @@ use actix_web::{
 };
 use ammonia::clean;
 use clap::{Parser, Subcommand};
-use futures::{future::join_all, FutureExt, StreamExt, TryFutureExt};
+use futures::{future::join_all, StreamExt};
 use hls::MasterPlaylist;
 use itertools::Itertools;
 use rustls::{pki_types::PrivateKeyDer, ServerConfig};

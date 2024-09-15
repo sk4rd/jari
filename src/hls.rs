@@ -67,9 +67,7 @@ impl<const P: usize, const S: usize> MasterPlaylist<P, S> {
 
 impl<const P: usize, const S: usize> Default for MasterPlaylist<P, S> {
     fn default() -> Self {
-        Self {
-            playlists: [(); P].map(|_| MediaPlaylist::default()),
-        }
+        Self::new([(); P].map(|_| MediaPlaylist::default()))
     }
 }
 
@@ -167,11 +165,7 @@ impl<const S: usize> MediaPlaylist<S> {
 
 impl<const S: usize> Default for MediaPlaylist<S> {
     fn default() -> Self {
-        Self {
-            current_index: S - 1,
-            current: 0,
-            segments: [(); S].map(|_| Segment::default()),
-        }
+        Self::new([(); S].map(|_| Segment::default()))
     }
 }
 
