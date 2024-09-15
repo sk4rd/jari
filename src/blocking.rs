@@ -1,4 +1,5 @@
 use std::{
+    borrow::Borrow,
     collections::HashMap,
     fs::{create_dir, remove_dir_all},
     io::Cursor,
@@ -182,6 +183,27 @@ pub fn main(
         .unwrap();
     let mut last = std::time::Instant::now();
     let _start = last.clone();
+    let mut radios_new = HashMap::new();
+    radios_new.extend(radios.into_iter().map(|(name, order)| {
+        use fdk_aac::enc::*;
+        (
+            name.clone(),
+            (
+                order,
+                BANDWIDTHS.map(|band| {
+                    Encoder::new(EncoderParams {
+                        bit_rate: BitRate::Cbr(band as u32),
+                        sample_rate: 44100,
+                        transport: fdk_aac::enc::Transport::Adts,
+                        channels: ChannelMode::Stereo,
+                    })
+                    .unwrap()
+                }),
+                44100,
+            ),
+        )
+    }));
+    let mut radios = radios_new;
     loop {
         let mut recvd = true;
         // Check for messages
@@ -255,18 +277,18 @@ pub fn main(
                         std::thread::spawn(move || decode_loop(format, decoder, track_id, path));
                     }
                     ToBlocking::Order { radio, order } => {
-                        let Some(radio_lock) = radios.get_mut(&radio) else {
+                        let Some((order_lock, _, _)) = radios.get_mut(&radio) else {
                             eprintln!("Tried to set the order for non-existent radio {radio}!");
                             break 'mesg_check;
                         };
-                        *radio_lock = order;
+                        *order_lock = order;
                     }
                     ToBlocking::Remove { radio, song } => {
-                        let Some(radio_lock) = radios.get_mut(&radio) else {
+                        let Some((order_lock, _, _)) = radios.get_mut(&radio) else {
                             eprintln!("Tried to remove song from non-existent radio {radio}!");
                             break 'mesg_check;
                         };
-                        radio_lock.retain(|e| e != &song);
+                        order_lock.retain(|e| e != &song);
                         let Ok(()) = remove_dir_all(root_dir.join(&radio).join(song.to_string()))
                         else {
                             eprintln!("Couldn't remove dir for song {song} in radio {radio} with root {}!", root_dir.display());
@@ -284,7 +306,23 @@ pub fn main(
                         };
                     }
                     ToBlocking::AddRadio { radio } => {
-                        radios.insert(radio.clone(), vec![]);
+                        use fdk_aac::enc::*;
+                        radios.insert(
+                            radio.clone(),
+                            (
+                                vec![],
+                                BANDWIDTHS.map(|band| {
+                                    Encoder::new(EncoderParams {
+                                        bit_rate: BitRate::Cbr(band as u32),
+                                        sample_rate: 44100,
+                                        transport: fdk_aac::enc::Transport::Adts,
+                                        channels: ChannelMode::Stereo,
+                                    })
+                                    .unwrap()
+                                }),
+                                44100,
+                            ),
+                        );
                         let Ok(()) = create_dir(root_dir.join(&radio)) else {
                             eprintln!(
                                 "Couldn't create dir for radio {radio} with root {}!",
@@ -304,9 +342,9 @@ pub fn main(
             // TODO: send/create next fragment
             let time_s = _start.elapsed().as_secs_f64();
             let segments = radios
-                .iter()
+                .iter_mut()
                 .par_bridge()
-                .map(|(name, order)| {
+                .map(|(name, (order, encoders, sample_rate))| {
                     let name = name.clone();
                     let path = root_dir.join(&name);
                     let lens: Box<[(u8, f64)]> = order
@@ -344,7 +382,7 @@ pub fn main(
                     };
                     let secs = (len - seg as f64 * 10.0).clamp(0.0, 10.0);
                     // eprintln!("Serving segment {seg} of song {song} in radio {name} len {secs}s");
-                    let Ok(segs) = recode(data) else {
+                    let Ok(segs) = recode(data, encoders, sample_rate) else {
                         eprintln!(
                             "Recoding error for segment {seg} of song {song} in radio {name}"
                         );
@@ -378,7 +416,11 @@ impl From<fdk_aac::enc::EncoderError> for RecodeError {
     }
 }
 
-fn recode(data: Vec<u8>) -> Result<[Box<[u8]>; NUM_BANDWIDTHS], RecodeError> {
+fn recode(
+    data: Vec<u8>,
+    encoders: &mut [fdk_aac::enc::Encoder; NUM_BANDWIDTHS],
+    current_sample_rate: &mut u32,
+) -> Result<[Box<[u8]>; NUM_BANDWIDTHS], RecodeError> {
     use fdk_aac::dec::*;
     use fdk_aac::enc::*;
     let mut segs = [(); NUM_BANDWIDTHS].map(|_| vec![]);
@@ -390,49 +432,63 @@ fn recode(data: Vec<u8>) -> Result<[Box<[u8]>; NUM_BANDWIDTHS], RecodeError> {
     let frame_size = decoder.decoded_frame_size();
     let stream_info = decoder.stream_info();
     // eprintln!("setting up encoders");
-    // dbg!(stream_info.sampleRate);
-    let mut encoders = BANDWIDTHS.map(|band| {
-        Encoder::new(EncoderParams {
-            bit_rate: BitRate::Cbr(band as u32),
-            sample_rate: stream_info.sampleRate as u32,
-            transport: fdk_aac::enc::Transport::Adts,
-            channels: if stream_info.numChannels == 2 {
-                ChannelMode::Stereo
-            } else {
-                ChannelMode::Mono
-            },
-        })
-        .unwrap()
-    });
+    let sample_rate = stream_info.sampleRate as u32;
+    if sample_rate != *current_sample_rate {
+        *current_sample_rate = sample_rate;
+        *encoders = BANDWIDTHS.map(|band| {
+            Encoder::new(EncoderParams {
+                bit_rate: BitRate::Cbr(band as u32),
+                sample_rate,
+                transport: fdk_aac::enc::Transport::Adts,
+                channels: ChannelMode::Stereo,
+            })
+            .unwrap()
+        });
+        for encoder in encoders.iter() {
+            let encoder_info = encoder.info().unwrap();
+
+            let samples_per_chunk = 2 * encoder_info.frameLength as usize;
+
+            let mut buf: [u8; 1536] = [0; 1536];
+
+            // This is necessary because otherwise the encoder would output two frames of silence
+            encoder
+                .encode(&frame[0..samples_per_chunk.clamp(0, frame.len())], &mut buf)
+                .unwrap();
+            encoder
+                .encode(
+                    &frame[samples_per_chunk.clamp(0, frame.len())
+                        ..(samples_per_chunk * 2).clamp(0, frame.len())],
+                    &mut buf,
+                )
+                .unwrap();
+        }
+    }
     for (i, encoder) in encoders.iter().enumerate() {
-        let encoder_info = encoder.info().unwrap();
-
-        let samples_per_chunk = 2 * encoder_info.frameLength as usize;
-
         let mut buf: [u8; 1536] = [0; 1536];
-
-        // This is necessary because otherwise the encoder would output two frames of silence
-        encoder
-            .encode(&frame[0..samples_per_chunk.clamp(0, frame.len())], &mut buf)
-            .unwrap();
-        encoder
-            .encode(
-                &frame[samples_per_chunk.clamp(0, frame.len())
-                    ..(samples_per_chunk * 2).clamp(0, frame.len())],
-                &mut buf,
-            )
-            .unwrap();
         let EncodeInfo {
             input_consumed: _,
             output_size,
         } = encoder.encode(&frame[..frame_size], &mut buf)?;
         segs[i].extend_from_slice(&buf[..output_size]);
     }
+    // dbg!(stream_info.sampleRate);
     // eprintln!("starting decode-encode loop");
     loop {
         // TODO(audio): make decoding somehow work
         let mut frame = vec![0; frame_size];
-        decoder.decode_frame(&mut frame)?;
+        match decoder.decode_frame(&mut frame) {
+            Err(DecoderError::NOT_ENOUGH_BITS) => {
+                if data.len() == 0 {
+                    break;
+                }
+                let consumed = decoder.fill(data)?;
+                data = &data[consumed..];
+                continue;
+            }
+            Err(e) => Err(e)?,
+            Ok(()) => (),
+        };
         for (i, encoder) in encoders.iter_mut().enumerate() {
             let mut buf: [u8; 1536] = [0; 1536];
             let EncodeInfo {
@@ -441,30 +497,6 @@ fn recode(data: Vec<u8>) -> Result<[Box<[u8]>; NUM_BANDWIDTHS], RecodeError> {
             } = encoder.encode(&frame, &mut buf)?;
             segs[i].extend_from_slice(&buf[..output_size]);
         }
-        if data.len() == 0 {
-            break;
-        }
-        let consumed = decoder.fill(data)?;
-        data = &data[consumed..];
-    }
-    for (i, encoder) in encoders.iter_mut().enumerate() {
-        let encoder_info = encoder.info().unwrap();
-
-        let samples_per_chunk = 2 * encoder_info.frameLength as usize;
-
-        let mut buf: [u8; 1536] = [0; 1536];
-
-        let empty_part = vec![0; samples_per_chunk];
-        let EncodeInfo {
-            input_consumed: _,
-            output_size,
-        } = encoder.encode(&empty_part, &mut buf).unwrap();
-        segs[i].extend_from_slice(&buf[..output_size]);
-        let EncodeInfo {
-            input_consumed: _,
-            output_size,
-        } = encoder.encode(&empty_part, &mut buf).unwrap();
-        segs[i].extend_from_slice(&buf[..output_size]);
     }
     Ok(segs.map(|seg| seg.into_boxed_slice()))
 }
