@@ -5,6 +5,7 @@ use actix_web::{
     App, HttpServer, Result,
 };
 use ammonia::clean;
+use auth::OidcClient;
 use clap::{Parser, Subcommand};
 use futures::{future::join_all, StreamExt};
 use hls::MasterPlaylist;
@@ -29,6 +30,8 @@ mod handlers;
 use handlers::*;
 
 mod hls;
+
+mod auth;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -127,6 +130,7 @@ pub struct AppState {
     pages: [String; 4],
     to_blocking: tokio::sync::mpsc::UnboundedSender<ToBlocking>,
     radio_states: RwLock<HashMap<String, RwLock<RadioState>>>,
+    oidc_client: Arc<OidcClient>,
 }
 /// Serializeble app state
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -183,11 +187,15 @@ fn main() -> std::io::Result<()> {
             // Create Channels for communication between blocking and async
             let (atx, arx) = unbounded_channel();
             let (stx, srx) = unbounded_channel();
+
+            let oidc_client = Arc::new(OidcClient::new().await);
+            
             // Create AppState
             let data: Arc<AppState> = Arc::new(AppState {
                 pages,
                 to_blocking: stx,
                 radio_states: RwLock::new(HashMap::new()),
+                oidc_client
             });
 
             let data_dir = PathBuf::from("./data");
