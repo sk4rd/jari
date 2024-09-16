@@ -379,7 +379,6 @@ pub fn main(
                         eprintln!("Couldn't read song file {seg} of song {song} in radio {name}");
                         return (name, Default::default());
                     };
-                    let secs = (len - seg as f64 * 10.0).clamp(0.0, 10.0);
                     // eprintln!("Serving segment {seg} of song {song} in radio {name} len {secs}s");
                     let Ok(segs) = recode(data, encoders, sample_rate) else {
                         eprintln!(
@@ -387,7 +386,7 @@ pub fn main(
                         );
                         return (name, Default::default());
                     };
-                    return (name, segs.map(|seg| Segment::new(seg, secs)));
+                    return (name, segs);
                 })
                 .collect();
             last += interval;
@@ -419,7 +418,7 @@ fn recode(
     data: Vec<u8>,
     encoders: &mut [fdk_aac::enc::Encoder; NUM_BANDWIDTHS],
     current_sample_rate: &mut u32,
-) -> Result<[Box<[u8]>; NUM_BANDWIDTHS], RecodeError> {
+) -> Result<[Segment; NUM_BANDWIDTHS], RecodeError> {
     use fdk_aac::dec::*;
     use fdk_aac::enc::*;
     let mut segs = [(); NUM_BANDWIDTHS].map(|_| vec![]);
@@ -473,6 +472,7 @@ fn recode(
     }
     // dbg!(stream_info.sampleRate);
     // eprintln!("starting decode-encode loop");
+    let mut samples = 0;
     loop {
         // TODO(audio): make decoding somehow work
         let mut frame = vec![0; frame_size];
@@ -488,6 +488,7 @@ fn recode(
             Err(e) => Err(e)?,
             Ok(()) => (),
         };
+        samples += frame_size;
         for (i, encoder) in encoders.iter_mut().enumerate() {
             let mut buf: [u8; 1536] = [0; 1536];
             let EncodeInfo {
@@ -497,5 +498,6 @@ fn recode(
             segs[i].extend_from_slice(&buf[..output_size]);
         }
     }
-    Ok(segs.map(|seg| seg.into_boxed_slice()))
+    let secs = samples as f64 / sample_rate as f64 / 2.0; // 2.0 is for stereo
+    Ok(segs.map(|seg| Segment::new(seg.into_boxed_slice(), secs)))
 }

@@ -78,6 +78,7 @@ pub struct MediaPlaylist<const S: usize> {
     current_index: usize,
     current: usize,
     segments: [Segment; S],
+    current_time: f64,
 }
 
 impl<const S: usize> MediaPlaylist<S> {
@@ -91,6 +92,7 @@ impl<const S: usize> MediaPlaylist<S> {
             current_index: S - 1,
             current: 0,
             segments,
+            current_time: 0.0,
         }
     }
     /// Add a Segment dropping the oldest
@@ -101,6 +103,9 @@ impl<const S: usize> MediaPlaylist<S> {
             0
         };
         self.current += 1;
+        if self.current >= S {
+            self.current_time += self.segments[self.current_index].secs()
+        };
         self.segments[self.current_index] = segment;
     }
     /// Get the ith segment processed with tags
@@ -109,15 +114,26 @@ impl<const S: usize> MediaPlaylist<S> {
         if index > S {
             return None;
         };
-        let mut seg = self.segments[if self.current_index >= index {
+        let place = if self.current_index >= index {
             self.current_index - index
         } else {
             self.current_index + S - index
-        }]
-        .get_raw()
-        .into_vec();
-
-        let timestamp = (i as u64) * 18000 * 10 * (1 + S as u64);
+        };
+        let mut seg = self.segments[place].get_raw().into_vec();
+        let earliest = if self.current >= S {
+            (self.current_index + 1) % S
+        } else {
+            S - 1
+        };
+        let timestamp = ((self.current_time
+            + if (place) >= (earliest) {
+                (earliest..place).chain(0..0)
+            } else {
+                (earliest..S).chain(0..place)
+            }
+            .map(|i| self.segments[i].secs())
+            .sum::<f64>())
+            * 90000.0) as u64;
         let mut time_vec = Vec::new();
         time_vec
             .write_u64::<byteorder::BigEndian>(timestamp)
