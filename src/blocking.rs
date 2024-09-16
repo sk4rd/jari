@@ -137,16 +137,16 @@ fn decode_loop(
     let mut buf: [u8; 1536] = [0; 1536];
 
     // This is necessary because otherwise the encoder would output two frames of silence
-    encoder
-        .encode(&pcm[0..samples_per_chunk.clamp(0, pcm.len())], &mut buf)
-        .unwrap();
-    encoder
-        .encode(
-            &pcm[samples_per_chunk.clamp(0, pcm.len())
-                ..(samples_per_chunk * 2).clamp(0, pcm.len())],
-            &mut buf,
-        )
-        .unwrap();
+    // encoder
+    //     .encode(&pcm[0..samples_per_chunk.clamp(0, pcm.len())], &mut buf)
+    //     .unwrap();
+    // encoder
+    //     .encode(
+    //         &pcm[samples_per_chunk.clamp(0, pcm.len())
+    //             ..(samples_per_chunk * 2).clamp(0, pcm.len())],
+    //         &mut buf,
+    //     )
+    //     .unwrap();
     for (i, part) in pcm.chunks(each_len).enumerate() {
         let mut compressed = Vec::<u8>::new();
 
@@ -472,16 +472,17 @@ fn recode(
     }
     // dbg!(stream_info.sampleRate);
     // eprintln!("starting decode-encode loop");
-    let mut samples = 0;
+    let mut samples = frame_size * 43;
+    let mut consumed = consumed;
     loop {
         // TODO(audio): make decoding somehow work
         let mut frame = vec![0; frame_size];
         match decoder.decode_frame(&mut frame) {
             Err(DecoderError::NOT_ENOUGH_BITS) => {
-                if data.len() == 0 {
+                if data.len() < consumed {
                     break;
                 }
-                let consumed = decoder.fill(data)?;
+                consumed = decoder.fill(data)?;
                 data = &data[consumed..];
                 continue;
             }
