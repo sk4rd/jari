@@ -442,27 +442,15 @@ fn recode(
             })
             .unwrap()
         });
-        for encoder in encoders.iter() {
+        for encoder in encoders.iter_mut() {
             let encoder_info = encoder.info().unwrap();
-
             let samples_per_chunk = 2 * encoder_info.frameLength as usize;
-
-            let mut buf: [u8; 1536] = [0; 1536];
-
-            // This is necessary because otherwise the encoder would output two frames of silence
-            encoder
-                .encode(&frame[0..samples_per_chunk.clamp(0, frame.len())], &mut buf)
-                .unwrap();
-            encoder
-                .encode(
-                    &frame[samples_per_chunk.clamp(0, frame.len())
-                        ..(samples_per_chunk * 2).clamp(0, frame.len())],
-                    &mut buf,
-                )
-                .unwrap();
+            let mut buf = [0; 1536];
+            encoder.encode(&frame[..samples_per_chunk], &mut buf)?;
+            encoder.encode(&frame[..samples_per_chunk], &mut buf)?;
         }
     }
-    for (i, encoder) in encoders.iter().enumerate() {
+    for (i, encoder) in encoders.iter_mut().enumerate() {
         let mut buf: [u8; 1536] = [0; 1536];
         let EncodeInfo {
             input_consumed: _,
@@ -472,7 +460,7 @@ fn recode(
     }
     // dbg!(stream_info.sampleRate);
     // eprintln!("starting decode-encode loop");
-    let mut samples = frame_size * 43;
+    let mut samples = frame_size;
     let mut consumed = consumed;
     loop {
         // TODO(audio): make decoding somehow work
@@ -491,12 +479,16 @@ fn recode(
         };
         samples += frame_size;
         for (i, encoder) in encoders.iter_mut().enumerate() {
-            let mut buf: [u8; 1536] = [0; 1536];
-            let EncodeInfo {
-                input_consumed: _,
-                output_size,
-            } = encoder.encode(&frame, &mut buf)?;
-            segs[i].extend_from_slice(&buf[..output_size]);
+            let encoder_info = encoder.info().unwrap();
+            let samples_per_chunk = 2 * encoder_info.frameLength as usize;
+            for chunk in frame.chunks(samples_per_chunk) {
+                let mut buf: [u8; 1536] = [0; 1536];
+                let EncodeInfo {
+                    input_consumed: _,
+                    output_size,
+                } = encoder.encode(&chunk, &mut buf)?;
+                segs[i].extend_from_slice(&buf[..output_size]);
+            }
         }
     }
     let secs = samples as f64 / sample_rate as f64 / 2.0; // 2.0 is for stereo
