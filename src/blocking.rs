@@ -439,20 +439,11 @@ fn recode(
             encoder.encode(&frame[..samples_per_chunk], &mut buf)?;
         }
     }
-    // for (i, encoder) in encoders.iter_mut().enumerate() {
-    //     let mut buf: [u8; 1536] = [0; 1536];
-    //     let EncodeInfo {
-    //         input_consumed: _,
-    //         output_size,
-    //     } = encoder.encode(&frame[..frame_size], &mut buf)?;
-    //     segs[i].extend_from_slice(&buf[..output_size]);
-    // }
     // dbg!(stream_info.sampleRate);
     // eprintln!("starting decode-encode loop");
     let mut samples = frame_size;
-    let delay = decoder.stream_info().outputDelay as usize;
+    let delay = decoder.stream_info().outputDelay as usize * 4;
     loop {
-        // TODO(audio): make decoding somehow work
         let mut frame = vec![0; frame_size];
         match decoder.decode_frame(&mut frame) {
             Err(DecoderError::NOT_ENOUGH_BITS) => {
@@ -467,13 +458,14 @@ fn recode(
             Ok(()) => (),
         };
         samples += frame_size;
-        if delay * 2 > samples {
+        if delay > samples {
             continue;
         }
+        let size = (samples - delay).min(frame_size);
         for (i, encoder) in encoders.iter_mut().enumerate() {
             let encoder_info = encoder.info().unwrap();
             let samples_per_chunk = 2 * encoder_info.frameLength as usize;
-            for chunk in frame.chunks(samples_per_chunk) {
+            for chunk in frame[frame_size - size..].chunks(samples_per_chunk) {
                 let mut buf: [u8; 1536] = [0; 1536];
                 let EncodeInfo {
                     input_consumed: _,
