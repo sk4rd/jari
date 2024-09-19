@@ -17,7 +17,7 @@ impl OidcClient {
     pub async fn new() -> Self {
         // Load env vars from .env
         dotenv().ok();
-        
+
         let issuer_url =
             IssuerUrl::new("https://accounts.google.com".to_string()).expect("Invalid issuer URL");
 
@@ -27,12 +27,10 @@ impl OidcClient {
             .expect("Failed to discover OpenId provider");
 
         // Get client id and secret from env vars
-        let client_id =
-            ClientId::new(env::var("OIDC_CLIENT_ID").expect("Missing OIDC_CLIENT_ID"));
+        let client_id = ClientId::new(env::var("OIDC_CLIENT_ID").expect("Missing OIDC_CLIENT_ID"));
 
-        let client_secret = ClientSecret::new(
-            env::var("OIDC_CLIENT_SECRET").expect("Missing OIDC_CLIENT_SECRET"),
-        );
+        let client_secret =
+            ClientSecret::new(env::var("OIDC_CLIENT_SECRET").expect("Missing OIDC_CLIENT_SECRET"));
 
         let redirect_url = RedirectUrl::new("http://localhost:8080/auth/callback".to_string())
             .expect("Invalid redirect URL");
