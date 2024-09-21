@@ -1,53 +1,53 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const playPauseButton = document.getElementById('playPauseButton');
-    const audio = document.getElementById('audio');
-    const playPauseIcon = playPauseButton.querySelector('.play-pause-icon');
-    const textContainer = document.getElementById('textContainer');
-    const currentTimeElement = document.getElementById('currentTime');
-    const totalTimeElement = document.getElementById('totalTime');
+// Get the play/pause button and the audio element
+const playPauseButton = document.getElementById('playPauseButton');
+const audio = document.getElementById('audio');
 
-    playPauseButton.addEventListener('click', () => {
-        if (audio.paused) {
-            audio.play().catch(error => {
-                console.error('Error playing audio:', error);
-            });
-            updateUIForPlaying();
-        } else {
-            audio.pause();
-            updateUIForPaused();
-        }
-    });
-
-    audio.addEventListener('ended', updateUIForPaused);
-
-    audio.addEventListener('timeupdate', () => {
-        currentTimeElement.textContent = formatTime(audio.currentTime);
-    });
-
-    audio.addEventListener('loadedmetadata', () => {
-        totalTimeElement.textContent = formatTime(audio.duration);
-    });
-
-    function updateUIForPlaying() {
-        playPauseIcon.classList.remove('fa-play');
-        playPauseIcon.classList.add('fa-pause');
-        textContainer.classList.add('spin');
-    }
-
-    function updateUIForPaused() {
-        playPauseIcon.classList.remove('fa-pause');
-        playPauseIcon.classList.add('fa-play');
-        textContainer.classList.remove('spin');
-    }
-
-    function formatTime(seconds) {
-        const minutes = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-
-    // Ensure total time is displayed if metadata is already loaded
-    if (audio.readyState >= 1) {
-        totalTimeElement.textContent = formatTime(audio.duration);
+// Add an event listener to the play/pause button
+playPauseButton.addEventListener('click', () => {
+    // Check if the audio is playing
+    if (audio.paused) {
+        // Play the audio
+        audio.play();
+        // Update the play/pause button icon
+        playPauseButton.querySelector('.play-pause-icon').classList.remove('fa-play');
+        playPauseButton.querySelector('.play-pause-icon').classList.add('fa-pause');
+        // Add the spinning class to the text element
+        document.querySelector('.spinning-text').classList.add('spin');
+    } else {
+        // Pause the audio
+        audio.pause();
+        // Update the play/pause button icon
+        playPauseButton.querySelector('.play-pause-icon').classList.remove('fa-pause');
+        playPauseButton.querySelector('.play-pause-icon').classList.add('fa-play');
+        // Remove the spinning class from the text element
+        document.querySelector('.spinning-text').classList.remove('spin');
     }
 });
+
+// Add an event listener to the audio element
+audio.addEventListener('timeupdate', () => {
+    // Get the current time and total time
+    const currentTime = audio.currentTime;
+    const totalTime = audio.duration;
+
+    // Format the current time and total time
+    const formattedCurrentTime = formatTime(currentTime);
+    const formattedTotalTime = formatTime(totalTime);
+
+    // Update the current time and total time displays
+    document.getElementById('currentTime').textContent = formattedCurrentTime;
+    document.getElementById('totalTime').textContent = formattedTotalTime;
+});
+
+// Add an event listener to the audio element
+audio.addEventListener('error', () => {
+    console.error('An error occurred during audio playback.');
+});
+
+// Function to format the time
+function formatTime(time) {
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}

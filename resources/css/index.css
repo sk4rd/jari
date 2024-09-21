@@ -64,9 +64,11 @@ a {
     transform: scale(1.01);
     color: #f39200;
 }
-.description{
+
+.description {
     color: rgba(0, 0, 0, 0.5);
 }
+
 .button1 {
     padding: 10pt 20pt;
     font-size: 16pt;
@@ -86,7 +88,8 @@ a {
     display: flex;
     margin-left: auto;
     margin-right: auto;
-    justify-content: center; /* Center the search bar */
+    justify-content: center;
+    /* Center the search bar */
 }
 
 #search1 {
@@ -96,20 +99,21 @@ a {
     margin-top: 10pt;
     margin-left: auto;
     margin-right: auto;
-    justify-content: center; /* Center the search bar */
+    justify-content: center;
+    /* Center the search bar */
 }
 
 form {
     display: flex;
     width: 80%;
 }
-.header-radio{
 
+.header-radio {
     margin: 1%;
     font-size: 40pt;
 }
 
-.description-radio{
+.description-radio {
     font-size: 15pt;
     margin-left: 1%;
     margin-bottom: 5%;
@@ -137,6 +141,7 @@ input[type="text"] {
     margin-left: auto;
     margin-right: auto;
 }
+
 .list-item2 {
     display: flex;
     width: 100%;
@@ -145,12 +150,14 @@ input[type="text"] {
     margin-left: auto;
     margin-right: auto;
 }
+
 .list-item2 img {
     width: 160pt;
     height: 160pt;
     border: 1pt solid #d97a00;
     margin: 10pt;
 }
+
 .list-item2 .content {
     display: flex;
     flex-direction: column;
@@ -234,8 +241,6 @@ label {
     color: #333;
 }
 
-
-
 .record {
     position: relative;
     width: 300pt;
@@ -247,6 +252,7 @@ label {
     align-items: center;
     box-shadow: 0 0 20pt rgba(0, 0, 0, 0.5);
 }
+
 .center-circle {
     position: absolute;
     width: 100pt;
@@ -258,10 +264,12 @@ label {
     align-items: center;
     cursor: pointer;
 }
+
 .play-pause-icon {
     font-size: 48pt;
     color: white;
 }
+
 .text-container {
     position: absolute;
     width: 100%;
@@ -270,16 +278,22 @@ label {
     left: 50%;
     transform: translate(-50%, -50%);
 }
-.spin {
+
+.spinning-text {
     animation: text-spin 10s linear infinite;
 }
+
 @keyframes text-spin {
-    from { transform: translate(-50%, -50%) rotate(0deg); }
-    to { transform: translate(-50%, -50%) rotate(360deg); }
+    from {
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
 }
+
 .time-container {
     margin-top: 20pt;
     font-family: Arial, sans-serif;
     color: #333;
 }
-
