@@ -7,6 +7,7 @@ use std::{
 };
 
 use fdk_aac::enc::{ChannelMode, EncodeInfo, EncoderParams};
+use itertools::Itertools;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use symphonia::core::{
     audio::{SampleBuffer, SignalSpec},
@@ -119,24 +120,23 @@ fn decode_loop(
     let num_channels = channels.count().clamp(0, 2);
     let each_len = rate as usize * 10 * num_channels;
     let total_secs = pcm.len() as f64 / (rate as f64 * num_channels as f64);
+    let encoder = fdk_aac::enc::Encoder::new(EncoderParams {
+        bit_rate: fdk_aac::enc::BitRate::VbrVeryHigh,
+        sample_rate: rate,
+        transport: fdk_aac::enc::Transport::Adts,
+        channels: if num_channels == 2 {
+            ChannelMode::Stereo
+        } else {
+            ChannelMode::Mono
+        },
+    })
+    .unwrap();
+    let encoder_info = encoder.info().unwrap();
+
+    let samples_per_chunk = 2 * encoder_info.frameLength as usize;
+
+    let mut buf: [u8; 1536] = [0; 1536];
     for (i, part) in pcm.chunks(each_len).enumerate() {
-        let encoder = fdk_aac::enc::Encoder::new(EncoderParams {
-            bit_rate: fdk_aac::enc::BitRate::VbrVeryHigh,
-            sample_rate: rate,
-            transport: fdk_aac::enc::Transport::Adts,
-            channels: if num_channels == 2 {
-                ChannelMode::Stereo
-            } else {
-                ChannelMode::Mono
-            },
-        })
-        .unwrap();
-        let encoder_info = encoder.info().unwrap();
-
-        let samples_per_chunk = 2 * encoder_info.frameLength as usize;
-
-        let mut buf: [u8; 1536] = [0; 1536];
-
         let mut compressed = Vec::<u8>::new();
 
         for chunk in part.chunks(samples_per_chunk) {
@@ -442,7 +442,7 @@ fn recode(
     // dbg!(stream_info.sampleRate);
     // eprintln!("starting decode-encode loop");
     let mut samples = frame_size;
-    let delay = decoder.stream_info().outputDelay as usize * 4;
+    let delay = decoder.stream_info().outputDelay as usize * 2;
     loop {
         let mut frame = vec![0; frame_size];
         match decoder.decode_frame(&mut frame) {
@@ -462,6 +462,11 @@ fn recode(
             continue;
         }
         let size = (samples - delay).min(frame_size);
+        // Was a test to see if we correctly calculated size
+        // if size != frame_size {
+        //     dbg!(frame.iter().find_position(|s| **s != 0));
+        //     dbg!(frame_size - size);
+        // }
         for (i, encoder) in encoders.iter_mut().enumerate() {
             let encoder_info = encoder.info().unwrap();
             let samples_per_chunk = 2 * encoder_info.frameLength as usize;
