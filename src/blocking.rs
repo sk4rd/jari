@@ -451,12 +451,8 @@ fn recode(
     }
     // dbg!(stream_info.sampleRate);
     // eprintln!("starting decode-encode loop");
-    let mut samples = frame_size;
-    let delay = if new_song {
-        decoder.stream_info().outputDelay as usize * 2
-    } else {
-        frame_size
-    };
+    let mut samples = if new_song { frame_size } else { 0 };
+    let delay = decoder.stream_info().outputDelay as usize * 2;
     loop {
         let mut frame = vec![0; frame_size];
         match decoder.decode_frame(&mut frame) {
