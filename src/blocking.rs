@@ -187,7 +187,8 @@ pub fn main(
                     })
                     .unwrap()
                 }),
-                44100,
+                fdk_aac::dec::Decoder::new(fdk_aac::dec::Transport::Adts),
+                true,
             ),
         )
     }));
@@ -265,14 +266,15 @@ pub fn main(
                         std::thread::spawn(move || decode_loop(format, decoder, track_id, path));
                     }
                     ToBlocking::Order { radio, order } => {
-                        let Some((order_lock, _, _)) = radios.get_mut(&radio) else {
+                        let Some((order_lock, _, _, new_song)) = radios.get_mut(&radio) else {
                             eprintln!("Tried to set the order for non-existent radio {radio}!");
                             break 'mesg_check;
                         };
                         *order_lock = order;
+                        *new_song = true;
                     }
                     ToBlocking::Remove { radio, song } => {
-                        let Some((order_lock, _, _)) = radios.get_mut(&radio) else {
+                        let Some((order_lock, _, _, _)) = radios.get_mut(&radio) else {
                             eprintln!("Tried to remove song from non-existent radio {radio}!");
                             break 'mesg_check;
                         };
@@ -308,7 +310,8 @@ pub fn main(
                                     })
                                     .unwrap()
                                 }),
-                                44100,
+                                fdk_aac::dec::Decoder::new(fdk_aac::dec::Transport::Adts),
+                                true,
                             ),
                         );
                         let Ok(()) = create_dir(root_dir.join(&radio)) else {
@@ -332,7 +335,7 @@ pub fn main(
             let segments = radios
                 .iter_mut()
                 .par_bridge()
-                .map(|(name, (order, encoders, sample_rate))| {
+                .map(|(name, (order, encoders, decoder, new_song))| {
                     let name = name.clone();
                     let path = root_dir.join(&name);
                     let lens: Box<[(u8, f64)]> = order
@@ -363,18 +366,22 @@ pub fn main(
                     let time = time - (offset - len);
                     let path = root_dir.join(&name).join(song.to_string());
                     let seg = (time / 10.0) as usize;
+                    if seg == 0 {
+                        *new_song = true;
+                    }
                     let Ok(data) = std::fs::read(path.join(seg.to_string()).with_extension("aac"))
                     else {
                         eprintln!("Couldn't read song file {seg} of song {song} in radio {name}");
                         return (name, Default::default());
                     };
                     // eprintln!("Serving segment {seg} of song {song} in radio {name} len {secs}s");
-                    let Ok(segs) = recode(data, encoders, sample_rate) else {
+                    let Ok(segs) = recode(data, encoders, decoder, *new_song) else {
                         eprintln!(
                             "Recoding error for segment {seg} of song {song} in radio {name}"
                         );
                         return (name, Default::default());
                     };
+                    *new_song = false;
                     return (name, segs);
                 })
                 .collect();
@@ -406,12 +413,16 @@ impl From<fdk_aac::enc::EncoderError> for RecodeError {
 fn recode(
     data: Vec<u8>,
     encoders: &mut [fdk_aac::enc::Encoder; NUM_BANDWIDTHS],
-    current_sample_rate: &mut u32,
+    decoder: &mut fdk_aac::dec::Decoder,
+    new_song: bool,
 ) -> Result<[Segment; NUM_BANDWIDTHS], RecodeError> {
     use fdk_aac::dec::*;
     use fdk_aac::enc::*;
     let mut segs = [(); NUM_BANDWIDTHS].map(|_| vec![]);
-    let mut decoder = Decoder::new(fdk_aac::dec::Transport::Adts);
+    if new_song {
+        *decoder = Decoder::new(fdk_aac::dec::Transport::Adts);
+        // eprintln!("reinit decoder");
+    }
     let consumed = decoder.fill(&data)?;
     let mut data = &data[consumed..];
     let mut frame = [0; 2048];
@@ -420,8 +431,7 @@ fn recode(
     let stream_info = decoder.stream_info();
     // eprintln!("setting up encoders");
     let sample_rate = stream_info.sampleRate as u32;
-    if sample_rate != *current_sample_rate {
-        *current_sample_rate = sample_rate;
+    if new_song {
         *encoders = BANDWIDTHS.map(|band| {
             Encoder::new(EncoderParams {
                 bit_rate: BitRate::Cbr(band as u32),
@@ -442,7 +452,11 @@ fn recode(
     // dbg!(stream_info.sampleRate);
     // eprintln!("starting decode-encode loop");
     let mut samples = frame_size;
-    let delay = decoder.stream_info().outputDelay as usize * 2;
+    let delay = if new_song {
+        decoder.stream_info().outputDelay as usize * 2
+    } else {
+        frame_size
+    };
     loop {
         let mut frame = vec![0; frame_size];
         match decoder.decode_frame(&mut frame) {
