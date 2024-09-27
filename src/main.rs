@@ -33,6 +33,8 @@ mod hls;
 
 mod auth;
 
+mod cli;
+
 #[derive(Parser, Debug)]
 #[command(version, about)]
 #[command(propagate_version = true)]
@@ -189,13 +191,13 @@ fn main() -> std::io::Result<()> {
             let (stx, srx) = unbounded_channel();
 
             let oidc_client = Arc::new(OidcClient::new().await);
-            
+
             // Create AppState
             let data: Arc<AppState> = Arc::new(AppState {
                 pages,
                 to_blocking: stx,
                 radio_states: RwLock::new(HashMap::new()),
-                oidc_client
+                oidc_client,
             });
 
             let data_dir = PathBuf::from("./data");
