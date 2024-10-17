@@ -1,23 +1,22 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title}</title>
+    <title>Your Radio Player</title>
     <!-- Font Awesome CSS -->
     <link href="./fonts/font-awesome/css/fontawesome.css" rel="stylesheet" />
     <link href="./fonts/font-awesome/css/solid.css" rel="stylesheet" />
     <!-- External CSS -->
     <link rel="stylesheet" href="./css/index.css" />
-
+    <!-- HLS.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="./js/radioplayer.js" defer></script>
-
     <script src="./js/radio.js" defer></script>
-
 </head>
 <body>
 <header class="header" style="background-color: rgb(100, 99, 99)">
-    <a id="text" href="start.html" class="title" style="color: rgb(243, 146, 0)" > JARI </a>
+    <a id="text" href="start.html" class="title" style="color: rgb(243, 146, 0)"> JARI </a>
     <section id="search">
         <form action="/search" method="get">
             <input type="text" id="search-input" name="q" placeholder="Suche ein Radio:" required />
@@ -55,7 +54,7 @@
     <span id="currentTime">00:00</span> / <span id="totalTime">00:00</span>
 </div>
 
-<audio id="audio" src="deine-audio-datei.mp3"></audio>
-listen without JavaScript using mpv https://this.site/{id}/listen
+<audio id="audio" controls></audio>
+<p>Listen without JavaScript using mpv <a href="https://this.site/{id}/listen">here</a>.</p>
 </body>
 </html>
