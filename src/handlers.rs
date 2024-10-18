@@ -1,8 +1,8 @@
 use crate::blocking::ToBlocking;
 use crate::errors::PageError;
-use crate::hls::MasterPlaylist;
 use crate::{AppState, Config, PartialConfig, RadioState, SentConfig};
 use actix_multipart::Multipart;
+use actix_web::web::Buf;
 use actix_web::{
     delete, put, routes,
     web::{self},
@@ -12,7 +12,7 @@ use futures::StreamExt;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
-use tokio::sync::RwLock;
+use tokio::sync::{watch, RwLock};
 
 #[routes]
 #[get("/")]
@@ -204,12 +204,14 @@ pub async fn add_radio(
         return Err(PageError::NotFound.into());
     }
 
+    let (tx, rx) = watch::channel(vec![]);
+
     let new_radio_state = RadioState {
         config: Config {
             title: config.title.into(),
             description: config.description.into(),
         },
-        playlist: MasterPlaylist::default(),
+        stream: rx,
         song_map: HashMap::new(),
         song_order: Vec::new(),
     };
@@ -217,10 +219,37 @@ pub async fn add_radio(
     radio_states.insert(id.clone(), RwLock::new(new_radio_state));
     state
         .to_blocking
-        .send(ToBlocking::AddRadio { radio: id.clone() })
+        .send(ToBlocking::AddRadio {
+            radio: id.clone(),
+            stream: tx,
+        })
         .map_err(PageError::from)?;
 
     Ok(HttpResponse::Created().body(format!("Radio added with ID: {}", id)))
+}
+
+#[routes]
+#[get("/{radio}/listen")]
+pub async fn get_audio(
+    path: web::Path<String>,
+    state: web::Data<Arc<AppState>>,
+) -> Result<HttpResponse, PageError> {
+    let stream = state
+        .radio_states
+        .read()
+        .await
+        .get(&path.into_inner())
+        .ok_or(PageError::NotFound)?
+        .read()
+        .await
+        .stream
+        .clone();
+    let stream = tokio_stream::wrappers::WatchStream::new(stream)
+        .map(|buf| Ok::<_, PageError>(actix_web::web::Bytes::copy_from_slice(&buf)));
+    Ok(HttpResponse::Ok()
+        .keep_alive()
+        .content_type("audio/aac")
+        .streaming(stream))
 }
 
 #[routes]

@@ -7,7 +7,6 @@ use std::{
 };
 
 use fdk_aac::enc::{ChannelMode, EncodeInfo, EncoderParams};
-use itertools::Itertools;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use symphonia::core::{
     audio::{SampleBuffer, SignalSpec},
@@ -17,9 +16,9 @@ use symphonia::core::{
     meta::MetadataOptions,
     probe::Hint,
 };
-use tokio::time::Instant;
+use tokio::sync::watch;
 
-use crate::{hls::Segment, BANDWIDTHS, NUM_BANDWIDTHS};
+use crate::{BANDWIDTHS, NUM_BANDWIDTHS};
 
 /// Messages, that can be sent to the blocking thread (mainly audio)
 #[derive(Debug, Clone)]
@@ -38,7 +37,10 @@ pub enum ToBlocking {
     /// Remove a radio
     RemoveRadio { radio: String },
     /// Add a radio
-    AddRadio { radio: String },
+    AddRadio {
+        radio: String,
+        stream: watch::Sender<Vec<u8>>,
+    },
 }
 
 fn decode_loop(
@@ -155,13 +157,9 @@ fn decode_loop(
 }
 /// The blocking thread, contains mainly audio processing
 pub fn main(
-    atx: tokio::sync::mpsc::UnboundedSender<(
-        Instant,
-        Vec<(String, [Segment; crate::NUM_BANDWIDTHS])>,
-    )>,
     mut srx: tokio::sync::mpsc::UnboundedReceiver<ToBlocking>,
     interval: Duration,
-    radios: HashMap<String, Vec<u8>>,
+    radios: HashMap<String, (Vec<u8>, watch::Sender<Vec<u8>>)>,
     root_dir: PathBuf,
 ) {
     // PANICKING: Since 10 != 0 and x - x / 10000 == x * 0.9999 >= 0 for Duration x which by Typedefinition is >= 0, this should never panic
@@ -172,12 +170,13 @@ pub fn main(
     let mut last = std::time::Instant::now();
     let _start = last.clone();
     let mut radios_new = HashMap::new();
-    radios_new.extend(radios.into_iter().map(|(name, order)| {
+    radios_new.extend(radios.into_iter().map(|(name, (order, stream))| {
         use fdk_aac::enc::*;
         (
             name.clone(),
             (
                 order,
+                stream,
                 BANDWIDTHS.map(|band| {
                     Encoder::new(EncoderParams {
                         bit_rate: BitRate::Cbr(band as u32),
@@ -266,7 +265,7 @@ pub fn main(
                         std::thread::spawn(move || decode_loop(format, decoder, track_id, path));
                     }
                     ToBlocking::Order { radio, order } => {
-                        let Some((order_lock, _, _, new_song)) = radios.get_mut(&radio) else {
+                        let Some((order_lock, _, _, _, new_song)) = radios.get_mut(&radio) else {
                             eprintln!("Tried to set the order for non-existent radio {radio}!");
                             break 'mesg_check;
                         };
@@ -274,7 +273,7 @@ pub fn main(
                         *new_song = true;
                     }
                     ToBlocking::Remove { radio, song } => {
-                        let Some((order_lock, _, _, _)) = radios.get_mut(&radio) else {
+                        let Some((order_lock, _, _, _, _)) = radios.get_mut(&radio) else {
                             eprintln!("Tried to remove song from non-existent radio {radio}!");
                             break 'mesg_check;
                         };
@@ -295,12 +294,13 @@ pub fn main(
                             break 'mesg_check;
                         };
                     }
-                    ToBlocking::AddRadio { radio } => {
+                    ToBlocking::AddRadio { radio, stream } => {
                         use fdk_aac::enc::*;
                         radios.insert(
                             radio.clone(),
                             (
                                 vec![],
+                                stream,
                                 BANDWIDTHS.map(|band| {
                                     Encoder::new(EncoderParams {
                                         bit_rate: BitRate::Cbr(band as u32),
@@ -332,10 +332,8 @@ pub fn main(
         if diff > short_interval {
             // TODO: send/create next fragment
             let time_s = _start.elapsed().as_secs_f64();
-            let segments = radios
-                .iter_mut()
-                .par_bridge()
-                .map(|(name, (order, encoders, decoder, new_song))| {
+            radios.iter_mut().par_bridge().for_each(
+                |(name, (order, stream, encoders, decoder, new_song))| {
                     let name = name.clone();
                     let path = root_dir.join(&name);
                     let lens: Box<[(u8, f64)]> = order
@@ -361,7 +359,7 @@ pub fn main(
                         })
                         .find(|(_, offset, _)| *offset >= time)
                     else {
-                        return (name, Default::default());
+                        return;
                     };
                     let time = time - (offset - len);
                     let path = root_dir.join(&name).join(song.to_string());
@@ -372,21 +370,20 @@ pub fn main(
                     let Ok(data) = std::fs::read(path.join(seg.to_string()).with_extension("aac"))
                     else {
                         eprintln!("Couldn't read song file {seg} of song {song} in radio {name}");
-                        return (name, Default::default());
+                        return;
                     };
                     // eprintln!("Serving segment {seg} of song {song} in radio {name} len {secs}s");
-                    let Ok(segs) = recode(data, encoders, decoder, *new_song) else {
+                    let Ok(_segs) = recode(data.clone(), encoders, decoder, *new_song) else {
                         eprintln!(
                             "Recoding error for segment {seg} of song {song} in radio {name}"
                         );
-                        return (name, Default::default());
+                        return;
                     };
                     *new_song = false;
-                    return (name, segs);
-                })
-                .collect();
+                    stream.send(data);
+                },
+            );
             last += interval;
-            atx.send((last.clone().into(), segments)).unwrap();
         } else {
             if !recvd {
                 std::thread::sleep(Duration::from_micros(1));
@@ -415,7 +412,7 @@ fn recode(
     encoders: &mut [fdk_aac::enc::Encoder; NUM_BANDWIDTHS],
     decoder: &mut fdk_aac::dec::Decoder,
     new_song: bool,
-) -> Result<[Segment; NUM_BANDWIDTHS], RecodeError> {
+) -> Result<[Vec<u8>; NUM_BANDWIDTHS], RecodeError> {
     use fdk_aac::dec::*;
     use fdk_aac::enc::*;
     let mut segs = [(); NUM_BANDWIDTHS].map(|_| vec![]);
@@ -490,6 +487,5 @@ fn recode(
             }
         }
     }
-    let secs = samples as f64 / sample_rate as f64 / 2.0; // 2.0 is for stereo
-    Ok(segs.map(|seg| Segment::new(seg.into_boxed_slice(), secs)))
+    Ok(segs)
 }

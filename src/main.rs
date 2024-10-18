@@ -8,7 +8,6 @@ use ammonia::clean;
 use auth::OidcClient;
 use clap::{Parser, Subcommand};
 use futures::{future::join_all, StreamExt};
-use hls::MasterPlaylist;
 use itertools::Itertools;
 use rustls::{pki_types::PrivateKeyDer, ServerConfig};
 use serde::{Deserialize, Serialize};
@@ -16,10 +15,10 @@ use std::{collections::HashMap, ops::Deref, path::PathBuf, sync::Arc};
 use tokio::{
     fs::read_to_string,
     select,
-    sync::{mpsc::unbounded_channel, RwLock},
+    sync::{mpsc::unbounded_channel, watch, RwLock},
     time::Duration,
 };
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio_stream::wrappers::{UnboundedReceiverStream, WatchStream};
 
 mod blocking;
 use blocking::ToBlocking;
@@ -28,8 +27,6 @@ mod errors;
 
 mod handlers;
 use handlers::*;
-
-mod hls;
 
 mod auth;
 
@@ -115,7 +112,7 @@ pub struct PartialConfig {
 #[derive(Debug, Clone)]
 pub struct RadioState {
     config: Config,
-    playlist: hls::MasterPlaylist<NUM_BANDWIDTHS, NUM_SEGMENTS>,
+    stream: watch::Receiver<Vec<u8>>,
     song_map: HashMap<String, u8>,
     song_order: Vec<String>,
 }
@@ -187,7 +184,6 @@ fn main() -> std::io::Result<()> {
                     .replace("login.html", "/auth")
             });
             // Create Channels for communication between blocking and async
-            let (atx, arx) = unbounded_channel();
             let (stx, srx) = unbounded_channel();
 
             let oidc_client = Arc::new(OidcClient::new().await);
@@ -215,12 +211,16 @@ fn main() -> std::io::Result<()> {
                     },
                 ) in loaded_state.radio_states.into_iter()
                 {
+                    let (tx, rx) = watch::channel(vec![]);
                     blocking_radio_map.insert(
                         name.clone(),
-                        song_order
-                            .iter()
-                            .filter_map(|song| song_map.get(song).copied())
-                            .collect(),
+                        (
+                            song_order
+                                .iter()
+                                .filter_map(|song| song_map.get(song).copied())
+                                .collect(),
+                            tx,
+                        ),
                     );
                     data.radio_states.write().await.insert(
                         name,
@@ -229,7 +229,7 @@ fn main() -> std::io::Result<()> {
                                 title: config.title.into(),
                                 description: config.description.into(),
                             },
-                            playlist: MasterPlaylist::default(),
+                            stream: rx,
                             song_map,
                             song_order,
                         }),
@@ -241,7 +241,6 @@ fn main() -> std::io::Result<()> {
             let blocking_data_dir = data_dir.clone();
             std::thread::spawn(|| {
                 blocking::main(
-                    atx,
                     srx,
                     Duration::from_secs(10),
                     blocking_radio_map,
@@ -268,9 +267,7 @@ fn main() -> std::io::Result<()> {
                         .service(set_song_order)
                         .service(remove_radio)
                         .service(remove_song)
-                        .service(hls::get_master)
-                        .service(hls::get_media)
-                        .service(hls::get_segment)
+                        .service(get_audio)
                         .service(Files::new("/reserved", "./resources").prefer_utf8(true))
                 });
                 let tls_env = (
@@ -306,20 +303,10 @@ fn main() -> std::io::Result<()> {
                 .run()
             };
 
-            // Start HLS worker task
-            let hls = {
-                let data = data.clone();
-                tokio::task::spawn(
-                    UnboundedReceiverStream::new(arx)
-                        .then(move |frame| hls::update(frame.0, frame.1, data.clone()))
-                        .collect::<()>(),
-                )
-            };
             // Run all tasks (until one finishes)
             // NOTE: Only use Futures that only finish on unrecoverable errors (but we still want to exit gracefully)
             let res = select! {
             x = server => x,
-            _ = hls => unreachable!()
             };
             // Save radio states
             let mut radio_states = data.radio_states.write().await;
@@ -327,7 +314,7 @@ fn main() -> std::io::Result<()> {
             for (name, radio_state) in radio_states.iter_mut() {
                 let RadioState {
                     config,
-                    playlist: _,
+                    stream: _,
                     song_map,
                     song_order,
                 } = radio_state.get_mut().clone();
