@@ -126,7 +126,7 @@ pub struct PersistentRadioState {
 /// Global async app state
 #[derive(Debug)]
 pub struct AppState {
-    pages: [String; 4],
+    pages: [String; 5],
     to_blocking: tokio::sync::mpsc::UnboundedSender<ToBlocking>,
     radio_states: RwLock<HashMap<String, RwLock<RadioState>>>,
     oidc_client: Arc<OidcClient>,
@@ -159,6 +159,7 @@ fn main() -> std::io::Result<()> {
                     read_to_string(path.join("radio.html")),
                     read_to_string(path.join("edit.html")),
                     read_to_string(path.join("login.html")),
+                    read_to_string(path.join("settings.html")),
                 ])
                 .await
                 .into_iter()
@@ -168,6 +169,7 @@ fn main() -> std::io::Result<()> {
                     files[1].clone(),
                     files[2].clone(),
                     files[3].clone(),
+                    files[4].clone(),
                 ]
             } else {
                 [
@@ -175,6 +177,7 @@ fn main() -> std::io::Result<()> {
                     include_str!("../resources/radio.html"),
                     include_str!("../resources/edit.html"),
                     include_str!("../resources/login.html"),
+                    include_str!("../resources/settings.html"),
                 ]
                 .map(|s| s.to_owned())
             }

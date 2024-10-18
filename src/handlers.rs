@@ -110,6 +110,13 @@ pub async fn get_auth_page(state: web::Data<Arc<AppState>>) -> impl Responder {
 }
 
 #[routes]
+#[get("/auth/settings")]
+#[get("/auth/settings/")]
+pub async fn get_settings_page(state: web::Data<Arc<AppState>>) -> impl Responder {
+    HttpResponse::Ok().body(state.pages[4].clone())
+}
+
+#[routes]
 #[get("/{radio}")]
 #[get("/{radio}/")]
 #[get("/{radio}/index.html")]
