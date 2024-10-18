@@ -4,38 +4,38 @@ const audio = document.getElementById('audio');
 const audioSrc = '.m3u8'; // Replace with your HLS stream URL#################################################################################################### URL
 
 // Check for HLS support
-if (Hls.isSupported()) {
-    const hls = new Hls();
-    hls.loadSource(audioSrc);
-    hls.attachMedia(audio);
+// if (Hls.isSupported()) {
+//     const hls = new Hls();
+//     hls.loadSource(audioSrc);
+//     hls.attachMedia(audio);
 
-    hls.on(Hls.Events.MANIFEST_PARSED, function() {
-        console.log('Manifest loaded, starting playback...');
-        audio.play();
-    });
+//     hls.on(Hls.Events.MANIFEST_PARSED, function() {
+//         console.log('Manifest loaded, starting playback...');
+//         audio.play();
+//     });
 
-    hls.on(Hls.Events.ERROR, function(event, data) {
-        if (data.fatal) {
-            switch (data.fatal) {
-                case Hls.ErrorTypes.NETWORK_ERROR:
-                    console.error('A network error occurred while loading the HLS stream.');
-                    break;
-                case Hls.ErrorTypes.MEDIA_ERROR:
-                    console.error('An error occurred while loading media.');
-                    break;
-                case Hls.ErrorTypes.OTHER_ERROR:
-                    console.error('An unknown error occurred.');
-                    break;
-            }
-        }
-    });
-} else if (audio.canPlayType('application/vnd.apple.mpegurl')) {
-    // This is for Safari or other browsers that support HLS natively
-    audio.src = audioSrc ;
-    audio.addEventListener('loadedmetadata', function() {
-        audio.play();
-    });
-}
+//     hls.on(Hls.Events.ERROR, function(event, data) {
+//         if (data.fatal) {
+//             switch (data.fatal) {
+//                 case Hls.ErrorTypes.NETWORK_ERROR:
+//                     console.error('A network error occurred while loading the HLS stream.');
+//                     break;
+//                 case Hls.ErrorTypes.MEDIA_ERROR:
+//                     console.error('An error occurred while loading media.');
+//                     break;
+//                 case Hls.ErrorTypes.OTHER_ERROR:
+//                     console.error('An unknown error occurred.');
+//                     break;
+//             }
+//         }
+//     });
+// } else if (audio.canPlayType('application/vnd.apple.mpegurl')) {
+//     // This is for Safari or other browsers that support HLS natively
+//     audio.src = audioSrc ;
+//     audio.addEventListener('loadedmetadata', function() {
+//         audio.play();
+//     });
+// }
 
 // Add an event listener to the play/pause button
 playPauseButton.addEventListener('click', () => {

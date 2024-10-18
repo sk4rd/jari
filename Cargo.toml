@@ -19,7 +19,7 @@ derive_more = "0.99.17"
 futures = "0.3.30"
 serde = { version = "1.0.197", features = ["derive"] }
 tokio = { version = "1.36.0", features = ["full"] }
-tokio-stream = "0.1.15"
+tokio-stream = {version = "0.1.15", features = ["sync"]}
 id3 = { version = "1.13.1", features = ["tokio"] }
 byteorder = "1.5.0"
 symphonia = { version = "0.5.4", features = ["all-codecs"] }
