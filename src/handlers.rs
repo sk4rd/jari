@@ -1,6 +1,6 @@
 use crate::blocking::ToBlocking;
 use crate::errors::PageError;
-use crate::{AppState, Config, PartialConfig, RadioState, SentConfig};
+use crate::{AppState, Config, PartialConfig, RadioState, SentConfig, BANDWIDTHS, NUM_BANDWIDTHS};
 use actix_multipart::Multipart;
 use actix_web::web::Buf;
 use actix_web::{
@@ -204,7 +204,7 @@ pub async fn add_radio(
         return Err(PageError::NotFound.into());
     }
 
-    let (tx, rx) = watch::channel(vec![]);
+    let (tx, rx) = watch::channel((vec![], [(); NUM_BANDWIDTHS].map(|_| vec![])));
 
     let new_radio_state = RadioState {
         config: Config {
@@ -230,6 +230,8 @@ pub async fn add_radio(
 
 #[routes]
 #[get("/{radio}/listen")]
+#[get("/{radio}/listen/")]
+#[get("/{radio}/listen.aac")]
 pub async fn get_audio(
     path: web::Path<String>,
     state: web::Data<Arc<AppState>>,
@@ -245,7 +247,41 @@ pub async fn get_audio(
         .stream
         .clone();
     let stream = tokio_stream::wrappers::WatchStream::new(stream)
-        .map(|buf| Ok::<_, PageError>(actix_web::web::Bytes::copy_from_slice(&buf)));
+        .map(|(buf, _)| Ok::<_, PageError>(actix_web::web::Bytes::copy_from_slice(&buf)));
+    Ok(HttpResponse::Ok()
+        .keep_alive()
+        .content_type("audio/aac")
+        .streaming(stream))
+}
+
+#[routes]
+#[get("/{radio}/listen/{band}")]
+#[get("/{radio}/listen/{band}/")]
+#[get("/{radio}/listen/{band}.aac")]
+pub async fn get_audio_band(
+    path: web::Path<(String, usize)>,
+    state: web::Data<Arc<AppState>>,
+) -> Result<HttpResponse, PageError> {
+    let (radio, band) = path.into_inner();
+    let band_id = BANDWIDTHS
+        .iter()
+        .enumerate()
+        .find(|(_, b)| b == &&band)
+        .ok_or(PageError::NotFound)?
+        .0;
+    let stream = state
+        .radio_states
+        .read()
+        .await
+        .get(&radio)
+        .ok_or(PageError::NotFound)?
+        .read()
+        .await
+        .stream
+        .clone();
+    let stream = tokio_stream::wrappers::WatchStream::new(stream).map(move |(_, bufs)| {
+        Ok::<_, PageError>(actix_web::web::Bytes::copy_from_slice(&bufs[band_id]))
+    });
     Ok(HttpResponse::Ok()
         .keep_alive()
         .content_type("audio/aac")

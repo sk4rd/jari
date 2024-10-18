@@ -112,7 +112,7 @@ pub struct PartialConfig {
 #[derive(Debug, Clone)]
 pub struct RadioState {
     config: Config,
-    stream: watch::Receiver<Vec<u8>>,
+    stream: watch::Receiver<(Vec<u8>, [Vec<u8>; NUM_BANDWIDTHS])>,
     song_map: HashMap<String, u8>,
     song_order: Vec<String>,
 }
@@ -211,7 +211,7 @@ fn main() -> std::io::Result<()> {
                     },
                 ) in loaded_state.radio_states.into_iter()
                 {
-                    let (tx, rx) = watch::channel(vec![]);
+                    let (tx, rx) = watch::channel((vec![], [(); NUM_BANDWIDTHS].map(|_| vec![])));
                     blocking_radio_map.insert(
                         name.clone(),
                         (
@@ -268,6 +268,7 @@ fn main() -> std::io::Result<()> {
                         .service(remove_radio)
                         .service(remove_song)
                         .service(get_audio)
+                        .service(get_audio_band)
                         .service(Files::new("/reserved", "./resources").prefer_utf8(true))
                 });
                 let tls_env = (

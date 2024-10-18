@@ -39,7 +39,7 @@ pub enum ToBlocking {
     /// Add a radio
     AddRadio {
         radio: String,
-        stream: watch::Sender<Vec<u8>>,
+        stream: watch::Sender<(Vec<u8>, [Vec<u8>; NUM_BANDWIDTHS])>,
     },
 }
 
@@ -159,7 +159,7 @@ fn decode_loop(
 pub fn main(
     mut srx: tokio::sync::mpsc::UnboundedReceiver<ToBlocking>,
     interval: Duration,
-    radios: HashMap<String, (Vec<u8>, watch::Sender<Vec<u8>>)>,
+    radios: HashMap<String, (Vec<u8>, watch::Sender<(Vec<u8>, [Vec<u8>; NUM_BANDWIDTHS])>)>,
     root_dir: PathBuf,
 ) {
     // PANICKING: Since 10 != 0 and x - x / 10000 == x * 0.9999 >= 0 for Duration x which by Typedefinition is >= 0, this should never panic
@@ -373,14 +373,14 @@ pub fn main(
                         return;
                     };
                     // eprintln!("Serving segment {seg} of song {song} in radio {name} len {secs}s");
-                    let Ok(_segs) = recode(data.clone(), encoders, decoder, *new_song) else {
+                    let Ok(segs) = recode(data.clone(), encoders, decoder, *new_song) else {
                         eprintln!(
                             "Recoding error for segment {seg} of song {song} in radio {name}"
                         );
                         return;
                     };
                     *new_song = false;
-                    let Ok(()) = stream.send(data) else {
+                    let Ok(()) = stream.send((data, segs)) else {
                         eprintln!("Couldn't send seg for radio {name}! Channel closed");
                         return;
                     };
