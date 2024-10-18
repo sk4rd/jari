@@ -109,6 +109,7 @@ pub async fn get_auth_page(state: web::Data<Arc<AppState>>) -> impl Responder {
     HttpResponse::Ok().body(state.pages[3].clone())
 }
 
+// TODO(auth): automatically set account based on token
 #[routes]
 #[get("/auth/settings")]
 #[get("/auth/settings/")]
@@ -172,6 +173,7 @@ pub async fn get_radio_edit_page(
     ))
 }
 
+// TODO(auth): verify user owns radio
 #[routes]
 #[post("/{radio}")]
 #[post("/{radio}/")]
@@ -198,6 +200,7 @@ pub async fn set_radio_config(
     )))
 }
 
+// TODO(auth): assign radio to user
 #[put("/{radio}")]
 pub async fn add_radio(
     path: web::Path<String>,
@@ -295,6 +298,7 @@ pub async fn get_audio_band(
         .streaming(stream))
 }
 
+// TODO(auth): verify user owns radio
 #[routes]
 #[put("/{radio}/songs/{song}")]
 #[put("/{radio}/songs/{song}/")]
@@ -372,6 +376,7 @@ pub async fn get_song_order(
     Ok(web::Json(radio_state.song_order.clone()))
 }
 
+// TODO(auth): verify user owns radio
 #[routes]
 #[put("/{radio}/order")]
 #[put("/{radio}/order/")]
@@ -406,6 +411,7 @@ pub async fn set_song_order(
     Ok(HttpResponse::Ok().body(format!("Update song order of radio with ID {}", radio_id)))
 }
 
+// TODO(auth): verify user owns radio
 #[delete("/{radio}")]
 pub async fn remove_radio(
     path: web::Path<String>,
@@ -428,6 +434,7 @@ pub async fn remove_radio(
     Ok(HttpResponse::Ok().body(format!("Radio with ID {} has been removed", id)))
 }
 
+// TODO(auth): verify user owns radio
 #[delete("/{radio}/songs/{song}")]
 pub async fn remove_song(
     path: web::Path<(String, String)>,
