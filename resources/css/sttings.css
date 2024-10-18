@@ -1,0 +1,41 @@
+/* Add styles for settings page */
+#settings {
+    width: 80%;
+    margin: 40px auto;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border: 1px solid #ccc;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+#settings h2 {
+    margin-top: 0;
+}
+
+#settings form {
+    margin-bottom: 20px;
+}
+
+#settings label {
+    display: block;
+    margin-bottom: 10px;
+}
+
+#settings input[type="text"], #settings textarea {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 1px solid #ccc;
+}
+
+#settings button {
+    padding: 10px 20px;
+    background-color: #f39200;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#settings button:hover {
+    background-color: #d97a00;
+}
