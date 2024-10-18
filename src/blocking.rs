@@ -380,7 +380,10 @@ pub fn main(
                         return;
                     };
                     *new_song = false;
-                    stream.send(data);
+                    let Ok(()) = stream.send(data) else {
+                        eprintln!("Couldn't send seg for radio {name}! Channel closed");
+                        return;
+                    };
                 },
             );
             last += interval;
