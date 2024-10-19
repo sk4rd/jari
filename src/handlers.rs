@@ -18,7 +18,7 @@ use tokio::sync::{watch, RwLock};
 #[get("/")]
 #[get("/index.html")]
 pub async fn get_start_page(state: web::Data<Arc<AppState>>) -> impl Responder {
-    let mut page = state.pages[0].clone();
+    let mut page = state.pages.read().await[0].clone();
     if let Some(start) = page.find("{radios}") {
         if let Some(end) = page.find("{radios-end}") {
             let snippet = (&page[start..end])
@@ -62,7 +62,7 @@ pub async fn get_search_page(
     state: web::Data<Arc<AppState>>,
 ) -> impl Responder {
     let query = query.into_inner().q;
-    let mut page = state.pages[0].clone();
+    let mut page = state.pages.read().await[0].clone();
     if let Some(start) = page.find("{radios}") {
         if let Some(end) = page.find("{radios-end}") {
             let snippet = (&page[start..end])
@@ -106,7 +106,7 @@ pub async fn get_search_page(
 #[get("/auth")]
 #[get("/auth/")]
 pub async fn get_auth_page(state: web::Data<Arc<AppState>>) -> impl Responder {
-    HttpResponse::Ok().body(state.pages[3].clone())
+    HttpResponse::Ok().body(state.pages.read().await[3].clone())
 }
 
 // TODO(auth): automatically set account based on token
@@ -114,7 +114,7 @@ pub async fn get_auth_page(state: web::Data<Arc<AppState>>) -> impl Responder {
 #[get("/auth/settings")]
 #[get("/auth/settings/")]
 pub async fn get_settings_page(state: web::Data<Arc<AppState>>) -> impl Responder {
-    HttpResponse::Ok().body(state.pages[4].clone())
+    HttpResponse::Ok().body(state.pages.read().await[4].clone())
 }
 
 #[routes]
@@ -139,7 +139,7 @@ pub async fn get_radio_page(
         .clone();
     // Return formatted data
     Ok(HttpResponse::Ok().body(
-        state.pages[1]
+        state.pages.read().await[1]
             .replace("{title}", &title)
             .replace("{id}", &id)
             .replace("{description}", &description),
@@ -166,7 +166,7 @@ pub async fn get_radio_edit_page(
         .config
         .clone();
     Ok(HttpResponse::Ok().body(
-        state.pages[2]
+        state.pages.read().await[2]
             .replace("{title}", &title)
             .replace("{id}", &id)
             .replace("{description}", &description),

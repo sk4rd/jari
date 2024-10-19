@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -15,6 +17,7 @@ enum Command {
     RemoveRadio { radio: String },
     ListRadios,
     ListSongs { radio: String },
+    ReloadPages { path: PathBuf },
     Save,
     Shutdown,
 }
@@ -29,6 +32,7 @@ trait CliListener {
     fn remove_radio(&self, radio: String) -> Result<String>;
     fn list_radios(&self) -> Result<Vec<String>>;
     fn list_songs(&self, radio: String) -> Result<Vec<String>>;
+    fn reload_pages(&self, path: PathBuf) -> Result<String>;
     fn save(&self) -> Result<String>;
     fn shutdown(&mut self) -> Result<String>;
 }
@@ -51,6 +55,7 @@ fn main() {
                 .reduce(|a, e| format!("{a}\n{e}"))
                 .unwrap_or(String::new())
         }),
+        Command::ReloadPages { path } => client.reload_pages(path),
         Command::Save => client.save(),
         Command::Shutdown => client.shutdown(),
     }

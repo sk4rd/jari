@@ -127,7 +127,7 @@ pub struct PersistentRadioState {
 /// Global async app state
 #[derive(Debug)]
 pub struct AppState {
-    pages: [String; 5],
+    pages: RwLock<[String; 5]>,
     to_blocking: tokio::sync::mpsc::UnboundedSender<ToBlocking>,
     radio_states: RwLock<HashMap<String, RwLock<RadioState>>>,
     oidc_client: Arc<OidcClient>,
@@ -142,6 +142,7 @@ struct CliListener {
     state: Arc<AppState>,
     shutdown: Option<oneshot::Sender<()>>,
     save: mpsc::UnboundedSender<oneshot::Sender<()>>,
+    reload_pages: mpsc::UnboundedSender<(PathBuf, oneshot::Sender<Result<(), String>>)>,
 }
 
 #[interface(name = "com.github.sk4rd.jari")]
@@ -200,6 +201,19 @@ impl CliListener {
         let res = radio_lock.read().await.song_map.keys().cloned().collect();
         res
     }
+    async fn reload_pages(&self, path: PathBuf) -> String {
+        let (tx, rx) = oneshot::channel();
+        let Ok(()) = self.reload_pages.send((path.clone(), tx)) else {
+            return format!("Couldn't send reload message");
+        };
+        let Ok(res) = rx.await else {
+            return format!("Couldn't recieve reload confirmation");
+        };
+        if let Err(e) = res {
+            return e;
+        };
+        format!("Reloaded pages from {path:?}")
+    }
     async fn save(&self) -> String {
         let (tx, rx) = oneshot::channel();
         let Ok(()) = self.save.send(tx) else {
@@ -224,6 +238,7 @@ async fn cli_listener(state: Arc<AppState>, data_dir: PathBuf) -> zbus::Result<(
 
     let (tx, rx) = oneshot::channel();
     let (tx_save, rx_save) = mpsc::unbounded_channel();
+    let (tx_reload, rx_reload) = mpsc::unbounded_channel();
     let save_stream = tokio_stream::wrappers::UnboundedReceiverStream::new(rx_save)
         .then(|tx: oneshot::Sender<()>| async {
             save_state(state.clone(), data_dir.clone()).await;
@@ -232,10 +247,25 @@ async fn cli_listener(state: Arc<AppState>, data_dir: PathBuf) -> zbus::Result<(
             };
         })
         .collect::<()>();
+    let reload_stream = tokio_stream::wrappers::UnboundedReceiverStream::new(rx_reload)
+        .then(
+            |(path, tx): (PathBuf, oneshot::Sender<Result<(), String>>)| async {
+                let res = match load_pages(Some(path)).await {
+                    Err(e) => Err(format!("Couldn't load pages {e}")),
+                    Ok(pages) => Ok(*state.pages.write().await = pages),
+                };
+
+                if let Err(_) = tx.send(res) {
+                    eprintln!("Couldn't send save confirmation")
+                };
+            },
+        )
+        .collect::<()>();
     let listener = CliListener {
         state: state.clone(),
         shutdown: Some(tx),
         save: tx_save,
+        reload_pages: tx_reload,
     };
     let _connection = connection::Builder::session()?
         .name("com.github.sk4rd.jari")?
@@ -244,7 +274,8 @@ async fn cli_listener(state: Arc<AppState>, data_dir: PathBuf) -> zbus::Result<(
         .await?;
     select! {
         x = rx => x.map_err(|_| zbus::Error::Failure("channel broke".to_owned()))?,
-        x = save_stream => x
+        x = save_stream => x,
+        x = reload_stream => x
     }
     Ok(())
 }
@@ -295,40 +326,7 @@ fn main() -> std::io::Result<()> {
         .build()
         .unwrap()
         .block_on(async {
-            let pages = if let Some(path) = args.pages {
-                // Read all files
-                let files = join_all([
-                    read_to_string(path.join("start.html")),
-                    read_to_string(path.join("radio.html")),
-                    read_to_string(path.join("edit.html")),
-                    read_to_string(path.join("login.html")),
-                    read_to_string(path.join("settings.html")),
-                ])
-                .await
-                .into_iter()
-                .collect::<Result<Box<[String]>, _>>()?;
-                [
-                    files[0].clone(),
-                    files[1].clone(),
-                    files[2].clone(),
-                    files[3].clone(),
-                    files[4].clone(),
-                ]
-            } else {
-                [
-                    include_str!("../resources/start.html"),
-                    include_str!("../resources/radio.html"),
-                    include_str!("../resources/edit.html"),
-                    include_str!("../resources/login.html"),
-                    include_str!("../resources/settings.html"),
-                ]
-                .map(|s| s.to_owned())
-            }
-            .map(|s| {
-                s.replace("./", "/reserved/")
-                    .replace("start.html", "/")
-                    .replace("login.html", "/auth")
-            });
+            let pages = load_pages(args.pages).await?;
             // Create Channels for communication between blocking and async
             let (stx, srx) = unbounded_channel();
 
@@ -336,7 +334,7 @@ fn main() -> std::io::Result<()> {
 
             // Create AppState
             let data: Arc<AppState> = Arc::new(AppState {
-                pages,
+                pages: RwLock::new(pages),
                 to_blocking: stx,
                 radio_states: RwLock::new(HashMap::new()),
                 oidc_client,
@@ -462,4 +460,41 @@ fn main() -> std::io::Result<()> {
             save_state(data, data_dir).await;
             res
         })
+}
+
+async fn load_pages(pages: Option<PathBuf>) -> std::io::Result<[String; 5]> {
+    Ok(if let Some(path) = pages {
+        // Read all files
+        let files = join_all([
+            read_to_string(path.join("start.html")),
+            read_to_string(path.join("radio.html")),
+            read_to_string(path.join("edit.html")),
+            read_to_string(path.join("login.html")),
+            read_to_string(path.join("settings.html")),
+        ])
+        .await
+        .into_iter()
+        .collect::<Result<Box<[String]>, _>>()?;
+        [
+            files[0].clone(),
+            files[1].clone(),
+            files[2].clone(),
+            files[3].clone(),
+            files[4].clone(),
+        ]
+    } else {
+        [
+            include_str!("../resources/start.html"),
+            include_str!("../resources/radio.html"),
+            include_str!("../resources/edit.html"),
+            include_str!("../resources/login.html"),
+            include_str!("../resources/settings.html"),
+        ]
+        .map(|s| s.to_owned())
+    }
+    .map(|s| {
+        s.replace("./", "/reserved/")
+            .replace("start.html", "/")
+            .replace("login.html", "/auth")
+    }))
 }
