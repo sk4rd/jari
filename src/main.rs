@@ -183,6 +183,23 @@ impl CliListener {
         };
         format!("Removed radio {radio}")
     }
+    async fn list_radios(&self) -> Vec<String> {
+        self.state
+            .radio_states
+            .read()
+            .await
+            .keys()
+            .cloned()
+            .collect()
+    }
+    async fn list_songs(&self, radio: String) -> Vec<String> {
+        let radios_lock = self.state.radio_states.read().await;
+        let Some(radio_lock) = radios_lock.get(&radio) else {
+            return vec![];
+        };
+        let res = radio_lock.read().await.song_map.keys().cloned().collect();
+        res
+    }
     async fn save(&self) -> String {
         save_state(self.state.clone(), self.data_dir.clone()).await;
         format!("Saved state")
