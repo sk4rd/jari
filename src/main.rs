@@ -7,7 +7,7 @@ use actix_web::{
 use ammonia::clean;
 use auth::OidcClient;
 use clap::{Parser, Subcommand};
-use futures::{future::join_all, StreamExt};
+use futures::{future::join_all, FutureExt, StreamExt, TryFutureExt};
 use itertools::Itertools;
 use rustls::{pki_types::PrivateKeyDer, ServerConfig};
 use serde::{Deserialize, Serialize};
@@ -135,6 +135,103 @@ pub struct AppState {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PersistentAppState {
     radio_states: HashMap<String, PersistentRadioState>,
+}
+
+async fn cli_listener(state: Arc<AppState>, data_dir: PathBuf) -> zbus::Result<()> {
+    use cli::*;
+    use zbus::{Connection, MessageStream};
+    let connection = Connection::session().await?;
+    let mut stream = MessageStream::from(&connection);
+    connection.request_name("com.github.sk4rd.jari").await?;
+    while let Some(Ok(mesg)) = stream.next().await {
+        let header = mesg.header();
+
+        match header.message_type() {
+            zbus::message::Type::MethodCall => {
+                let body = mesg.body();
+                let Ok(m): Result<SerCommand, _> = body.deserialize() else {
+                    let _ = connection
+                        .reply(&header, &format!("invalid body, can't deserialize"))
+                        .await;
+                    continue;
+                };
+                match m {
+                    SerCommand::RemoveSong { radio, song } => {
+                        let radios_lock = state.radio_states.read().await;
+                        let Some(radio_lock) = radios_lock.get(&radio) else {
+                            let _ = connection.reply(
+                                &header,
+                                &format!(
+                                    "can't remove song from radio {radio} because the radio doesn't exist"
+                                ),
+                            ).await;
+                            continue;
+                        };
+                        let mut radio_lock = radio_lock.write().await;
+                        let Some(&song_id) = radio_lock.song_map.get(&song) else {
+                            let _ = connection.reply(
+                                &header,
+                                &format!(
+                                    "can't remove song {song} from radio {radio} because the song doesn't exist"
+                                ),
+                            ).await;
+                            continue;
+                        };
+
+                        radio_lock.song_map.remove(&song);
+                        radio_lock.song_order.retain(|name| name != &song);
+
+                        state
+                            .to_blocking
+                            .send(ToBlocking::Remove {
+                                radio,
+                                song: song_id,
+                            })
+                            .map_err(|e| zbus::Error::Failure(e.to_string()))?
+                    }
+                    SerCommand::RemoveRadio { radio, .. } => state
+                        .to_blocking
+                        .send(ToBlocking::RemoveRadio { radio })
+                        .map_err(|e| zbus::Error::Failure(e.to_string()))?,
+                    SerCommand::Save { .. } => save_state(state.clone(), data_dir.clone()).await,
+                    SerCommand::Shutdown { .. } => return Ok(()),
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+async fn save_state(data: Arc<AppState>, data_dir: PathBuf) {
+    let mut radio_states = data.radio_states.write().await;
+    let mut persistent_radio_states = HashMap::new();
+    for (name, radio_state) in radio_states.iter_mut() {
+        let RadioState {
+            config,
+            stream: _,
+            song_map,
+            song_order,
+        } = radio_state.get_mut().clone();
+        persistent_radio_states.insert(
+            name.clone(),
+            PersistentRadioState {
+                config: SentConfig {
+                    title: config.title.into(),
+                    description: config.description.into(),
+                },
+                song_map,
+                song_order,
+            },
+        );
+    }
+    let state = PersistentAppState {
+        radio_states: persistent_radio_states,
+    };
+    let state_buf = postcard::to_allocvec(&state).unwrap();
+    tokio::fs::write(data_dir.join("state"), state_buf)
+        .await
+        .unwrap();
 }
 
 fn main() -> std::io::Result<()> {
@@ -307,40 +404,16 @@ fn main() -> std::io::Result<()> {
                 .run()
             };
 
+            let cli = cli_listener(data.clone(), data_dir.clone());
+
             // Run all tasks (until one finishes)
             // NOTE: Only use Futures that only finish on unrecoverable errors (but we still want to exit gracefully)
             let res = select! {
             x = server => x,
+            x = cli.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string())) => {eprintln!("Cli shutdown"); x},
             };
             // Save radio states
-            let mut radio_states = data.radio_states.write().await;
-            let mut persistent_radio_states = HashMap::new();
-            for (name, radio_state) in radio_states.iter_mut() {
-                let RadioState {
-                    config,
-                    stream: _,
-                    song_map,
-                    song_order,
-                } = radio_state.get_mut().clone();
-                persistent_radio_states.insert(
-                    name.clone(),
-                    PersistentRadioState {
-                        config: SentConfig {
-                            title: config.title.into(),
-                            description: config.description.into(),
-                        },
-                        song_map,
-                        song_order,
-                    },
-                );
-            }
-            let state = PersistentAppState {
-                radio_states: persistent_radio_states,
-            };
-            let state_buf = postcard::to_allocvec(&state).unwrap();
-            tokio::fs::write(data_dir.join("state"), state_buf)
-                .await
-                .unwrap();
+            save_state(data, data_dir).await;
             res
         })
 }
