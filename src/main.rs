@@ -15,7 +15,7 @@ use std::{collections::HashMap, ops::Deref, path::PathBuf, sync::Arc};
 use tokio::{
     fs::read_to_string,
     select,
-    sync::{mpsc::unbounded_channel, oneshot, watch, RwLock},
+    sync::{mpsc, mpsc::unbounded_channel, oneshot, watch, RwLock},
     time::Duration,
 };
 use tokio_stream::wrappers::{UnboundedReceiverStream, WatchStream};
@@ -140,8 +140,8 @@ pub struct PersistentAppState {
 
 struct CliListener {
     state: Arc<AppState>,
-    data_dir: PathBuf,
-    tx: Option<oneshot::Sender<()>>,
+    shutdown: Option<oneshot::Sender<()>>,
+    save: mpsc::UnboundedSender<oneshot::Sender<()>>,
 }
 
 #[interface(name = "com.github.sk4rd.jari")]
@@ -201,11 +201,17 @@ impl CliListener {
         res
     }
     async fn save(&self) -> String {
-        save_state(self.state.clone(), self.data_dir.clone()).await;
+        let (tx, rx) = oneshot::channel();
+        let Ok(()) = self.save.send(tx) else {
+            return format!("Couldn't send save message");
+        };
+        let Ok(()) = rx.await else {
+            return format!("Couldn't recieve save confirmation");
+        };
         format!("Saved state")
     }
     async fn shutdown(&mut self) -> String {
-        let Some(tx) = self.tx.take() else {
+        let Some(tx) = self.shutdown.take() else {
             return format!("Couldn't shut down");
         };
         let _ = tx.send(());
@@ -217,18 +223,29 @@ async fn cli_listener(state: Arc<AppState>, data_dir: PathBuf) -> zbus::Result<(
     use zbus::connection;
 
     let (tx, rx) = oneshot::channel();
+    let (tx_save, rx_save) = mpsc::unbounded_channel();
+    let save_stream = tokio_stream::wrappers::UnboundedReceiverStream::new(rx_save)
+        .then(|tx: oneshot::Sender<()>| async {
+            save_state(state.clone(), data_dir.clone()).await;
+            if let Err(()) = tx.send(()) {
+                eprintln!("Couldn't send save confirmation")
+            };
+        })
+        .collect::<()>();
     let listener = CliListener {
-        state,
-        data_dir,
-        tx: Some(tx),
+        state: state.clone(),
+        shutdown: Some(tx),
+        save: tx_save,
     };
     let _connection = connection::Builder::session()?
         .name("com.github.sk4rd.jari")?
         .serve_at("/com/github/sk4rd/jari", listener)?
         .build()
         .await?;
-    rx.await
-        .map_err(|_| zbus::Error::Failure("channel broke".to_owned()))?;
+    select! {
+        x = rx => x.map_err(|_| zbus::Error::Failure("channel broke".to_owned()))?,
+        x = save_stream => x
+    }
     Ok(())
 }
 
