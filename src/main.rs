@@ -7,7 +7,7 @@ use actix_web::{
 use ammonia::clean;
 use auth::OidcClient;
 use clap::{Parser, Subcommand};
-use futures::{future::join_all, FutureExt, StreamExt, TryFutureExt};
+use futures::{future::join_all, StreamExt, TryFutureExt};
 use itertools::Itertools;
 use rustls::{pki_types::PrivateKeyDer, ServerConfig};
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,6 @@ use tokio::{
     sync::{mpsc, mpsc::unbounded_channel, oneshot, watch, RwLock},
     time::Duration,
 };
-use tokio_stream::wrappers::{UnboundedReceiverStream, WatchStream};
 use zbus::interface;
 
 mod blocking;
@@ -88,7 +87,6 @@ impl Deref for CleanString {
 }
 
 const NUM_BANDWIDTHS: usize = 4;
-const NUM_SEGMENTS: usize = 4;
 
 const BANDWIDTHS: [usize; NUM_BANDWIDTHS] = [128000, 96000, 48000, 24000];
 /// Radio Config

@@ -1,9 +1,7 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
-use futures::StreamExt;
-use serde::{Deserialize, Serialize};
-use zbus::{blocking::Connection, proxy, zvariant::Type, Result};
+use zbus::{blocking::Connection, proxy, Result};
 
 #[derive(Parser)]
 struct Args {
