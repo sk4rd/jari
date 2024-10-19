@@ -15,10 +15,11 @@ use std::{collections::HashMap, ops::Deref, path::PathBuf, sync::Arc};
 use tokio::{
     fs::read_to_string,
     select,
-    sync::{mpsc::unbounded_channel, watch, RwLock},
+    sync::{mpsc::unbounded_channel, oneshot, watch, RwLock},
     time::Duration,
 };
 use tokio_stream::wrappers::{UnboundedReceiverStream, WatchStream};
+use zbus::interface;
 
 mod blocking;
 use blocking::ToBlocking;
@@ -137,69 +138,81 @@ pub struct PersistentAppState {
     radio_states: HashMap<String, PersistentRadioState>,
 }
 
-async fn cli_listener(state: Arc<AppState>, data_dir: PathBuf) -> zbus::Result<()> {
-    use cli::*;
-    use zbus::{Connection, MessageStream};
-    let connection = Connection::session().await?;
-    let mut stream = MessageStream::from(&connection);
-    connection.request_name("com.github.sk4rd.jari").await?;
-    while let Some(Ok(mesg)) = stream.next().await {
-        let header = mesg.header();
+struct CliListener {
+    state: Arc<AppState>,
+    data_dir: PathBuf,
+    tx: Option<oneshot::Sender<()>>,
+}
 
-        match header.message_type() {
-            zbus::message::Type::MethodCall => {
-                let body = mesg.body();
-                let Ok(m): Result<SerCommand, _> = body.deserialize() else {
-                    let _ = connection
-                        .reply(&header, &format!("invalid body, can't deserialize"))
-                        .await;
-                    continue;
-                };
-                match m {
-                    SerCommand::RemoveSong { radio, song } => {
-                        let radios_lock = state.radio_states.read().await;
-                        let Some(radio_lock) = radios_lock.get(&radio) else {
-                            let _ = connection.reply(
-                                &header,
-                                &format!(
-                                    "can't remove song from radio {radio} because the radio doesn't exist"
-                                ),
-                            ).await;
-                            continue;
-                        };
-                        let mut radio_lock = radio_lock.write().await;
-                        let Some(&song_id) = radio_lock.song_map.get(&song) else {
-                            let _ = connection.reply(
-                                &header,
-                                &format!(
-                                    "can't remove song {song} from radio {radio} because the song doesn't exist"
-                                ),
-                            ).await;
-                            continue;
-                        };
+#[interface(name = "com.github.sk4rd.jari")]
+impl CliListener {
+    async fn remove_song(&self, radio: String, song: String) -> String {
+        let radios_lock = self.state.radio_states.read().await;
+        let Some(radio_lock) = radios_lock.get(&radio) else {
+            return format!("can't remove song from radio {radio} because the radio doesn't exist");
+        };
+        let mut radio_lock = radio_lock.write().await;
+        let Some(&song_id) = radio_lock.song_map.get(&song) else {
+            return format!(
+                "can't remove song {song} from radio {radio} because the song doesn't exist"
+            );
+        };
 
-                        radio_lock.song_map.remove(&song);
-                        radio_lock.song_order.retain(|name| name != &song);
+        radio_lock.song_map.remove(&song);
+        radio_lock.song_order.retain(|name| name != &song);
 
-                        state
-                            .to_blocking
-                            .send(ToBlocking::Remove {
-                                radio,
-                                song: song_id,
-                            })
-                            .map_err(|e| zbus::Error::Failure(e.to_string()))?
-                    }
-                    SerCommand::RemoveRadio { radio, .. } => state
-                        .to_blocking
-                        .send(ToBlocking::RemoveRadio { radio })
-                        .map_err(|e| zbus::Error::Failure(e.to_string()))?,
-                    SerCommand::Save { .. } => save_state(state.clone(), data_dir.clone()).await,
-                    SerCommand::Shutdown { .. } => return Ok(()),
-                }
-            }
-            _ => {}
-        }
+        let Ok(()) = self.state.to_blocking.send(ToBlocking::Remove {
+            radio: radio.clone(),
+            song: song_id,
+        }) else {
+            eprintln!("Couldn't send message to blocking");
+            return "Internal Error".to_owned();
+        };
+        format!("Removed song {song} from radio {radio}")
     }
+    async fn remove_radio(&self, radio: String) -> String {
+        let mut radios_lock = self.state.radio_states.write().await;
+        let Some(_) = radios_lock.remove(&radio) else {
+            return format!("Can't remove radio {radio} because it doesn't exist");
+        };
+        let Ok(()) = self.state.to_blocking.send(ToBlocking::RemoveRadio {
+            radio: radio.clone(),
+        }) else {
+            eprintln!("Couldn't send message to blocking");
+            return "Internal Error".to_owned();
+        };
+        format!("Removed radio {radio}")
+    }
+    async fn save(&self) -> String {
+        save_state(self.state.clone(), self.data_dir.clone()).await;
+        format!("Saved state")
+    }
+    async fn shutdown(&mut self) -> String {
+        let Some(tx) = self.tx.take() else {
+            return format!("Couldn't shut down");
+        };
+        let _ = tx.send(());
+        format!("Shutting down!")
+    }
+}
+
+async fn cli_listener(state: Arc<AppState>, data_dir: PathBuf) -> zbus::Result<()> {
+    use zbus::Connection;
+    let connection = Connection::session().await?;
+
+    let (tx, rx) = oneshot::channel();
+    let listener = CliListener {
+        state,
+        data_dir,
+        tx: Some(tx),
+    };
+    connection
+        .object_server()
+        .at("/com/github/sk4rd/jari", listener)
+        .await?;
+    connection.request_name("com.github.sk4rd.jari").await?;
+    rx.await
+        .map_err(|_| zbus::Error::Failure("channel broke".to_owned()))?;
     Ok(())
 }
 
