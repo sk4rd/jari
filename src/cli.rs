@@ -16,6 +16,7 @@ enum Command {
     ListRadios,
     ListSongs { radio: String },
     ReloadPages { path: PathBuf },
+    PrintState,
     Save,
     Shutdown,
 }
@@ -31,6 +32,7 @@ trait CliListener {
     fn list_radios(&self) -> Result<Vec<String>>;
     fn list_songs(&self, radio: String) -> Result<Vec<String>>;
     fn reload_pages(&self, path: PathBuf) -> Result<String>;
+    fn print_state(&self) -> Result<String>;
     fn save(&self) -> Result<String>;
     fn shutdown(&mut self) -> Result<String>;
 }
@@ -54,6 +56,7 @@ fn main() {
                 .unwrap_or(String::new())
         }),
         Command::ReloadPages { path } => client.reload_pages(path),
+        Command::PrintState => client.print_state(),
         Command::Save => client.save(),
         Command::Shutdown => client.shutdown(),
     }

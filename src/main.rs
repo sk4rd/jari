@@ -212,6 +212,9 @@ impl CliListener {
         };
         format!("Reloaded pages from {path:?}")
     }
+    async fn print_state(&self) -> String {
+        format!("{:?}", self.state)
+    }
     async fn save(&self) -> String {
         let (tx, rx) = oneshot::channel();
         let Ok(()) = self.save.send(tx) else {
