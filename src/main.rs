@@ -197,8 +197,7 @@ impl CliListener {
 }
 
 async fn cli_listener(state: Arc<AppState>, data_dir: PathBuf) -> zbus::Result<()> {
-    use zbus::Connection;
-    let connection = Connection::session().await?;
+    use zbus::connection;
 
     let (tx, rx) = oneshot::channel();
     let listener = CliListener {
@@ -206,11 +205,11 @@ async fn cli_listener(state: Arc<AppState>, data_dir: PathBuf) -> zbus::Result<(
         data_dir,
         tx: Some(tx),
     };
-    connection
-        .object_server()
-        .at("/com/github/sk4rd/jari", listener)
+    let _connection = connection::Builder::session()?
+        .name("com.github.sk4rd.jari")?
+        .serve_at("/com/github/sk4rd/jari", listener)?
+        .build()
         .await?;
-    connection.request_name("com.github.sk4rd.jari").await?;
     rx.await
         .map_err(|_| zbus::Error::Failure("channel broke".to_owned()))?;
     Ok(())
