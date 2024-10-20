@@ -7,9 +7,11 @@ use std::{
 };
 
 use fdk_aac::enc::{ChannelMode, EncodeInfo, EncoderParams};
+use itertools::Itertools;
 use rayon::iter::{ParallelBridge, ParallelIterator};
+use rubato::Resampler;
 use symphonia::core::{
-    audio::{SampleBuffer, SignalSpec},
+    audio::{AudioBuffer, SampleBuffer, SignalSpec},
     codecs::{Decoder, DecoderOptions, CODEC_TYPE_NULL},
     formats::{FormatOptions, FormatReader},
     io::MediaSourceStream,
@@ -49,10 +51,11 @@ fn decode_loop(
     track_id: u32,
     path: PathBuf,
 ) {
+    use symphonia::core::conv::FromSample;
     use symphonia::core::errors::Error;
 
     let mut pcm = vec![];
-    let mut spec = None;
+    const TARGET_RATE: usize = 48000;
     // The decode loop.
     loop {
         // Get the next packet from the media format.
@@ -93,13 +96,41 @@ fn decode_loop(
         match decoder.decode(&packet) {
             Ok(decoded) => {
                 // Consume the decoded audio samples (see below).
+                let spec = *decoded.spec();
+                let frames = decoded.frames();
 
-                spec = Some(decoded.spec().clone());
-                let mut sample_buf = SampleBuffer::new(decoded.capacity() as u64, *decoded.spec());
+                if spec.rate as usize != TARGET_RATE {
+                    let mut wave_in = SampleBuffer::<f64>::new(decoded.capacity() as u64, spec);
+                    wave_in.copy_planar_ref(decoded);
 
-                sample_buf.copy_interleaved_ref(decoded);
+                    // TODO: make stereo if mono
+                    let waves_in = wave_in.samples().chunks(wave_in.len() / 2).collect_vec();
 
-                pcm.extend_from_slice(sample_buf.samples());
+                    let mut resampler = rubato::FastFixedIn::new(
+                        TARGET_RATE as f64 / spec.rate as f64,
+                        2.0,
+                        rubato::PolynomialDegree::Septic,
+                        frames,
+                        2,
+                    )
+                    .unwrap();
+
+                    let mut waves_out = resampler.process(&waves_in, None).unwrap();
+
+                    let wave_out = waves_out
+                        .remove(0)
+                        .into_iter()
+                        .interleave(waves_out.remove(0))
+                        .map(i16::from_sample)
+                        .collect_vec();
+                    pcm.extend_from_slice(&wave_out);
+                } else {
+                    let mut wave_out = SampleBuffer::new(decoded.capacity() as u64, spec);
+
+                    wave_out.copy_interleaved_ref(decoded);
+
+                    pcm.extend_from_slice(wave_out.samples());
+                };
             }
             Err(Error::IoError(_)) => {
                 // The packet failed to decode due to an IO error, skip the packet.
@@ -115,16 +146,13 @@ fn decode_loop(
             }
         }
     }
-    let SignalSpec { rate, channels } = spec.unwrap();
-    if channels.count() > 2 {
-        todo!("Discard other channels");
-    }
-    let num_channels = channels.count().clamp(0, 2);
+    let rate = TARGET_RATE;
+    let num_channels = 2;
     let each_len = rate as usize * 10 * num_channels;
     let total_secs = pcm.len() as f64 / (rate as f64 * num_channels as f64);
     let encoder = fdk_aac::enc::Encoder::new(EncoderParams {
         bit_rate: fdk_aac::enc::BitRate::VbrVeryHigh,
-        sample_rate: rate,
+        sample_rate: rate as u32,
         transport: fdk_aac::enc::Transport::Adts,
         channels: if num_channels == 2 {
             ChannelMode::Stereo
