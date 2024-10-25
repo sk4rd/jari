@@ -11,7 +11,7 @@ use itertools::Itertools;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use rubato::Resampler;
 use symphonia::core::{
-    audio::{AudioBuffer, SampleBuffer, SignalSpec},
+    audio::SampleBuffer,
     codecs::{Decoder, DecoderOptions, CODEC_TYPE_NULL},
     formats::{FormatOptions, FormatReader},
     io::MediaSourceStream,
@@ -380,7 +380,7 @@ pub fn main(
                     let total_len: f64 = lens.iter().map(|(_, len)| len).sum();
                     let time = time_s % total_len;
                     let Some((song, offset, len)) = lens
-                        .into_iter()
+                        .iter()
                         .scan(0.0f64, |pre_len, (song, len)| {
                             *pre_len += len;
                             Some((song, *pre_len, len))

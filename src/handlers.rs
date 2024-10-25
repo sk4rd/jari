@@ -358,6 +358,26 @@ pub async fn upload_song(
 }
 
 #[routes]
+#[get("/{radio}/songs")]
+#[get("/{radio}/songs/")]
+pub async fn get_songs(
+    path: web::Path<String>,
+    state: web::Data<Arc<AppState>>,
+) -> Result<web::Json<Vec<String>>, PageError> {
+    let radio_id = path.into_inner();
+    let radio_states = state.radio_states.read().await;
+    let radio_state = radio_states
+        .get(&radio_id)
+        .ok_or(PageError::NotFound)?
+        .read()
+        .await;
+
+    Ok(web::Json(
+        radio_state.song_map.keys().cloned().collect_vec(),
+    ))
+}
+
+#[routes]
 #[get("/{radio}/order")]
 #[get("/{radio}/order/")]
 pub async fn get_song_order(

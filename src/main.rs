@@ -408,6 +408,7 @@ fn main() -> std::io::Result<()> {
                         .service(set_radio_config)
                         .service(add_radio)
                         .service(upload_song)
+                        .service(get_songs)
                         .service(get_song_order)
                         .service(set_song_order)
                         .service(remove_radio)
