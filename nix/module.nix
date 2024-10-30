@@ -39,6 +39,12 @@ in
   };
 
   config = mkIf cfg.enable {
+    users.users."jari" = {
+      isSystemUser = true;
+      home = "/var/lib/jari";
+      createHome = true;
+    };
+  
     systemd.services.jari = {
       description = "Jari Service";
       after = [ "network.target" ];
@@ -50,6 +56,9 @@ in
       serviceConfig = {
         ExecStart = "${package}/bin/jari --port ${toString cfg.port}";
         Restart = "always";
+        User = "jari";
+        Group = "jari";
+        WorkingDirectory = "${users.users.jari.home}";
       };
     };
 
