@@ -408,6 +408,7 @@ fn main() -> std::io::Result<()> {
                         .service(get_auth_page)
                         .service(get_radio_page)
                         .service(get_radio_edit_page)
+                        .service(get_settings_page)
                         .service(set_radio_config)
                         .service(add_radio)
                         .service(upload_song)
