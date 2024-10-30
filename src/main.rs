@@ -5,10 +5,11 @@ use actix_web::{
     App, HttpServer, Result,
 };
 use ammonia::clean;
-use auth::OidcClient;
+use auth::{google_callback, google_redirect, OidcClient};
 use clap::{Parser, Subcommand};
 use futures::{future::join_all, StreamExt, TryFutureExt};
 use itertools::Itertools;
+use openidconnect::SubjectIdentifier;
 use rustls::{pki_types::PrivateKeyDer, ServerConfig};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::Deref, path::PathBuf, sync::Arc};
@@ -129,6 +130,7 @@ pub struct AppState {
     to_blocking: tokio::sync::mpsc::UnboundedSender<ToBlocking>,
     radio_states: RwLock<HashMap<String, RwLock<RadioState>>>,
     oidc_client: Arc<OidcClient>,
+    users: RwLock<HashMap<SubjectIdentifier, Option<String>>>,
 }
 /// Serializeble app state
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -339,6 +341,7 @@ fn main() -> std::io::Result<()> {
                 to_blocking: stx,
                 radio_states: RwLock::new(HashMap::new()),
                 oidc_client,
+                users: RwLock::new(HashMap::new()),
             });
 
             let data_dir = PathBuf::from("./data");
@@ -415,6 +418,8 @@ fn main() -> std::io::Result<()> {
                         .service(remove_song)
                         .service(get_audio)
                         .service(get_audio_band)
+                        .service(google_redirect)
+                        .service(google_callback)
                         .service(Files::new("/reserved", "./resources").prefer_utf8(true))
                 });
                 let tls_env = (

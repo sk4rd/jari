@@ -15,6 +15,8 @@ pub enum PageError {
     ResourceNotFound,
     #[display(fmt = "File type is unsupported")]
     UnsupportedFileType,
+    #[display(fmt = "Authentication error")]
+    AuthError,
 }
 
 impl ResponseError for PageError {
@@ -25,6 +27,7 @@ impl ResponseError for PageError {
             PageError::MultipartError => StatusCode::BAD_REQUEST,
             PageError::ResourceNotFound => StatusCode::BAD_REQUEST,
             PageError::UnsupportedFileType => StatusCode::BAD_REQUEST,
+            PageError::AuthError => StatusCode::BAD_REQUEST,
         }
     }
 }
