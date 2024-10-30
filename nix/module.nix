@@ -41,9 +41,12 @@ in
   config = mkIf cfg.enable {
     users.users."jari" = {
       isSystemUser = true;
+      group = "jari";
       home = "/var/lib/jari";
       createHome = true;
     };
+
+    users.groups.jari = { };
   
     systemd.services.jari = {
       description = "Jari Service";
