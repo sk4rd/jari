@@ -61,7 +61,7 @@ in
         Restart = "always";
         User = "jari";
         Group = "jari";
-        WorkingDirectory = "${users.users.jari.home}";
+        WorkingDirectory = "${config.users.users.jari.home}";
       };
     };
 
