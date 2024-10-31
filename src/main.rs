@@ -39,14 +39,12 @@ mod cli;
 struct Args {
     #[arg(short, long)]
     port: Option<u16>,
-    #[arg(short = 'P', long)]
-    pages: Option<PathBuf>,
     #[arg(short, long)]
     threads: Option<usize>,
     #[command(subcommand)]
     tls: Option<TlsArgs>,
     #[arg(short, long)]
-    data_dir: Option<PathBuf>,
+    working_dir: Option<PathBuf>,
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -331,7 +329,7 @@ fn main() -> std::io::Result<()> {
         .build()
         .unwrap()
         .block_on(async {
-            let pages = load_pages(args.pages).await?;
+            let pages = load_pages(args.working_dir.clone()).await?;
             // Create Channels for communication between blocking and async
             let (stx, srx) = unbounded_channel();
 
@@ -346,7 +344,7 @@ fn main() -> std::io::Result<()> {
                 users: RwLock::new(HashMap::new()),
             });
 
-            let data_dir = args.data_dir.unwrap_or(PathBuf::from("./data"));
+            let data_dir = args.working_dir.clone().map(|d| d.join("data")).unwrap_or(PathBuf::from("./data"));
             // Load radio state
             let mut blocking_radio_map = HashMap::new();
             if let Ok(state_file) = tokio::fs::read(data_dir.join("state")).await {
@@ -401,6 +399,7 @@ fn main() -> std::io::Result<()> {
             // Start web server task
             let server = {
                 let data = data.clone();
+                let working_dir = Arc::new(args.working_dir.clone());
                 let server = HttpServer::new(move || {
                     App::new()
                         .app_data(web::Data::new(data.clone()))
@@ -423,7 +422,7 @@ fn main() -> std::io::Result<()> {
                         .service(get_audio_band)
                         .service(google_redirect)
                         .service(google_callback)
-                        .service(Files::new("/reserved", "./resources").prefer_utf8(true))
+                        .service(Files::new("/reserved", (*working_dir).clone().unwrap_or(PathBuf::from(".")).join("resources")).prefer_utf8(true))
                 });
                 let tls_env = (
                     std::env::vars()
@@ -473,7 +472,8 @@ fn main() -> std::io::Result<()> {
 }
 
 async fn load_pages(pages: Option<PathBuf>) -> std::io::Result<[String; 5]> {
-    Ok(if let Some(path) = pages {
+    Ok({
+        let path = pages.unwrap_or(PathBuf::from(".")).join("resources");
         // Read all files
         let files = join_all([
             read_to_string(path.join("start.html")),
@@ -492,15 +492,6 @@ async fn load_pages(pages: Option<PathBuf>) -> std::io::Result<[String; 5]> {
             files[3].clone(),
             files[4].clone(),
         ]
-    } else {
-        [
-            include_str!("../resources/start.html"),
-            include_str!("../resources/radio.html"),
-            include_str!("../resources/edit.html"),
-            include_str!("../resources/login.html"),
-            include_str!("../resources/settings.html"),
-        ]
-        .map(|s| s.to_owned())
     }
     .map(|s| {
         s.replace("./", "/reserved/")
