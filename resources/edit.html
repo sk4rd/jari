@@ -1,41 +1,54 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
+  <head>
+    <title>Edit {title}</title>
+    <!-- Font Awesome CSS -->
+    <link href="./fonts/font-awesome/css/fontawesome.css" rel="stylesheet" />
+    <link href="./fonts/font-awesome/css/solid.css" rel="stylesheet" />
+    <!-- External CSS -->
+    <link rel="stylesheet" href="./css/index.css" />
+    <link rel="stylesheet" href="./css/edit.css" />
+  </head>
 
-<head>
-  <title>Edit {title}</title>
-  <!-- Font Awesome CSS -->
-  <link href="./fonts/font-awesome/css/fontawesome.css" rel="stylesheet" />
-  <link href="./fonts/font-awesome/css/solid.css" rel="stylesheet" />
-  <!-- External CSS -->
-  <link rel="stylesheet" href="./css/index.css">
-  <link rel="stylesheet" href="./css/edit.css">
-</head>
-
-<body>
-  <header class="header" style="background-color: rgb(100, 99, 99);">
-    <a id="text" href="start.html" class="title" style="color: rgb(243, 146, 0);"> JARI
-    </a>
-    <button class="button1" onclick="window.location.href='radio.html'">Radio Page</button>
-  </header>
-  <main class="content">
-    <div class="input-ctrl-cont">
-      <div class="input">
-        <p><textarea id="title" style="width: 100%;">{title}</textarea></p>
-        <p><textarea id="description" style="width: 100%; min-height: 80pt;">{description}</textarea></p>
-      </div class="ctrl">
-      <button onclick="get_edit_content()">Submit</button>
-      <input type="file" id="upload">
-    </div>
-    </div>
-    <div class="input-ctrl-cont" style="margin-top: auto;">
-      <div id="order-list" class="input" style="height: 200pt; border: solid black 0.5pt;">
+  <body>
+    <header class="header" style="background-color: rgb(100, 99, 99)">
+      <a
+        id="text"
+        href="start.html"
+        class="title"
+        style="color: rgb(243, 146, 0)"
+      >
+        JARI
+      </a>
+      <button class="button1" onclick="window.location.href='radio.html'">
+        Radio Page
+      </button>
+    </header>
+    <main class="content">
+      <div class="input-ctrl-cont">
+        <div class="input ctrl">
+          <p><textarea id="title" style="width: 100%">{title}</textarea></p>
+          <p>
+            <textarea id="description" style="width: 100%; min-height: 80pt">
+{description}</textarea
+            >
+          </p>
+        </div>
+        <button onclick="get_edit_content()">Submit</button>
+        <input type="file" id="upload" />
       </div>
-      <div class="ctrl">
-        <button>Set Order</button>
-        <select id="selections" style="min-width: 100pt;"></select>
+      <div class="input-ctrl-cont" style="margin-top: auto">
+        <div
+          id="order-list"
+          class="input"
+          style="height: 200pt; border: solid black 0.5pt"
+        ></div>
+        <div class="ctrl">
+          <button>Set Order</button>
+          <select id="selections" style="min-width: 100pt"></select>
+        </div>
       </div>
-    </div>
-  </main>
-</body>
-<script src="./js/edit.js"></script>
+    </main>
+  </body>
+  <script src="./js/edit.js"></script>
 </html>

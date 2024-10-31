@@ -1,299 +1,310 @@
 body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
 }
 
 main * {
-    margin: 1pt;
-    box-sizing: border-box;
-    border-radius: 2pt;
+  margin: 1pt;
+  box-sizing: border-box;
+  border-radius: 2pt;
 }
 
 header * {
-    border-radius: 2pt;
+  border-radius: 2pt;
 }
 
 a {
-    text-decoration: none;
+  text-decoration: none;
 }
 
 .header {
-    margin: 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10pt 20pt;
-    background-color: #f4f4f4;
-    border-bottom: 1pt solid #ccc;
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10pt 20pt;
+  background-color: #f4f4f4;
+  border-bottom: 1pt solid #ccc;
 }
 
 .header .title {
-    font-size: 24pt;
-    font-weight: bold;
-    cursor: pointer;
-    transition: transform 0.3s ease, color 0.3s ease;
+  font-size: 24pt;
+  font-weight: bold;
+  cursor: pointer;
+  transition:
+    transform 0.3s ease,
+    color 0.3s ease;
 }
 
 .header .title:hover {
-    transform: scale(1.1);
-    color: #007BFF;
+  transform: scale(1.1);
+  color: #007bff;
 }
 
 .div1 {
-    font-size: 24pt;
-    font-weight: bold;
-    cursor: pointer;
-    transition: transform 0.3s ease, color 0.3s ease;
+  font-size: 24pt;
+  font-weight: bold;
+  cursor: pointer;
+  transition:
+    transform 0.3s ease,
+    color 0.3s ease;
 }
 
 .div1:hover {
-    transform: scale(1.01);
-    color: #f39200;
+  transform: scale(1.01);
+  color: #f39200;
 }
 
 .div2 {
-    font-size: 24pt;
-    margin-top: 10pt;
-    font-weight: bold;
-    cursor: pointer;
-    transition: transform 0.3s ease, color 0.3s ease;
+  font-size: 24pt;
+  margin-top: 10pt;
+  font-weight: bold;
+  cursor: pointer;
+  transition:
+    transform 0.3s ease,
+    color 0.3s ease;
 }
 
 .div2:hover {
-    transform: scale(1.01);
-    color: #f39200;
+  transform: scale(1.01);
+  color: #f39200;
 }
 
 .description {
-    color: rgba(0, 0, 0, 0.5);
+  color: rgba(0, 0, 0, 0.5);
 }
 
 .button1 {
-    padding: 10pt 20pt;
-    font-size: 16pt;
-    cursor: pointer;
-    background-color: #f39200;
-    border: none;
-    transition: background-color 0.3s ease, transform 0.3s ease;
+  padding: 10pt 20pt;
+  font-size: 16pt;
+  cursor: pointer;
+  background-color: #f39200;
+  border: none;
+  transition:
+    background-color 0.3s ease,
+    transform 0.3s ease;
 }
 
 .button1:hover {
-    background-color: #d97a00;
-    transform: scale(1.05);
+  background-color: #d97a00;
+  transform: scale(1.05);
 }
 
 #search {
-    width: 80%;
-    display: flex;
-    margin-left: auto;
-    margin-right: auto;
-    justify-content: center;
-    /* Center the search bar */
+  width: 80%;
+  display: flex;
+  margin-left: auto;
+  margin-right: auto;
+  justify-content: center;
+  /* Center the search bar */
 }
 
 #search1 {
-    width: 80%;
-    display: flex;
-    margin-bottom: 10pt;
-    margin-top: 10pt;
-    margin-left: auto;
-    margin-right: auto;
-    justify-content: center;
-    /* Center the search bar */
+  width: 80%;
+  display: flex;
+  margin-bottom: 10pt;
+  margin-top: 10pt;
+  margin-left: auto;
+  margin-right: auto;
+  justify-content: center;
+  /* Center the search bar */
 }
 
 form {
-    display: flex;
-    width: 80%;
+  display: flex;
+  width: 80%;
 }
 
 .header-radio {
-    margin: 1%;
-    font-size: 40pt;
+  margin: 1%;
+  font-size: 40pt;
 }
 
 .description-radio {
-    font-size: 15pt;
-    margin-left: 1%;
-    margin-bottom: 5%;
+  font-size: 15pt;
+  margin-left: 1%;
+  margin-bottom: 5%;
 }
 
 input[type="text"] {
-    flex: 1;
-    padding: 10pt;
-    box-sizing: border-box;
-    border: 1pt solid #ccc;
-    border-radius: 4pt 0 0 4pt;
-    font-size: 16pt;
+  flex: 1;
+  padding: 10pt;
+  box-sizing: border-box;
+  border: 1pt solid #ccc;
+  border-radius: 4pt 0 0 4pt;
+  font-size: 16pt;
 }
 
 ::placeholder {
-    color: #999;
+  color: #999;
 }
 
 .list-item {
-    display: flex;
-    border: 2pt solid black;
-    width: 600pt;
-    height: 100pt;
-    margin-bottom: 1%;
-    margin-left: auto;
-    margin-right: auto;
+  display: flex;
+  border: 2pt solid black;
+  width: 600pt;
+  height: 100pt;
+  margin-bottom: 1%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .list-item2 {
-    display: flex;
-    width: 100%;
-    height: 200pt;
-    margin-bottom: 1%;
-    margin-left: auto;
-    margin-right: auto;
+  display: flex;
+  width: 100%;
+  height: 200pt;
+  margin-bottom: 1%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .list-item2 img {
-    width: 160pt;
-    height: 160pt;
-    border: 1pt solid #d97a00;
-    margin: 10pt;
+  width: 160pt;
+  height: 160pt;
+  border: 1pt solid #d97a00;
+  margin: 10pt;
 }
 
 .list-item2 .content {
-    display: flex;
-    flex-direction: column;
-    width: inherit;
-    margin-bottom: 2pt;
+  display: flex;
+  flex-direction: column;
+  width: inherit;
+  margin-bottom: 2pt;
 }
 
 .list-item img {
-    width: 80pt;
-    height: 80pt;
-    border: 1pt solid #d97a00;
-    margin: 10pt;
+  width: 80pt;
+  height: 80pt;
+  border: 1pt solid #d97a00;
+  margin: 10pt;
 }
 
 .list-item .content {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 2pt;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 2pt;
 }
 
 .list-item .content .title {
-    font-weight: bold;
+  font-weight: bold;
 }
 
 audio {
-    width: 80%;
-    background-color: rgba(0, 0, 0, 0.2);
-    display: flex;
-    margin: 0 auto;
+  width: 80%;
+  background-color: rgba(0, 0, 0, 0.2);
+  display: flex;
+  margin: 0 auto;
 }
 
 label {
-    color: #F39200FF;
+  color: #f39200ff;
 }
 
 .audio-player {
-    display: flex;
-    align-items: center;
-    background: #ffffff;
-    padding: 10pt 20pt;
-    border-radius: 50pt;
-    box-shadow: 0 4pt 8pt rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  padding: 10pt 20pt;
+  border-radius: 50pt;
+  box-shadow: 0 4pt 8pt rgba(0, 0, 0, 0.1);
 }
 
 .play-pause-btn {
-    background: #ff6f61;
-    border: none;
-    border-radius: 50%;
-    width: 50pt;
-    height: 50pt;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    outline: none;
-    transition: background 0.3s;
+  background: #ff6f61;
+  border: none;
+  border-radius: 50%;
+  width: 50pt;
+  height: 50pt;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  outline: none;
+  transition: background 0.3s;
 }
 
 .play-pause-btn:hover {
-    background: #ff8578;
+  background: #ff8578;
 }
 
-.play-icon, .pause-icon {
-    color: #ffffff;
-    font-size: 24pt;
-    display: none;
+.play-icon,
+.pause-icon {
+  color: #ffffff;
+  font-size: 24pt;
+  display: none;
 }
 
-.play-icon.show, .pause-icon.show {
-    display: block;
+.play-icon.show,
+.pause-icon.show {
+  display: block;
 }
 
 .seek-slider {
-    width: 200pt;
-    margin: 0 10pt;
-    cursor: pointer;
+  width: 200pt;
+  margin: 0 10pt;
+  cursor: pointer;
 }
 
-.current-time, .duration {
-    font-size: 14pt;
-    color: #333;
+.current-time,
+.duration {
+  font-size: 14pt;
+  color: #333;
 }
 
 .record {
-    position: relative;
-    width: 300pt;
-    height: 300pt;
-    border-radius: 50%;
-    background-color: black;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    box-shadow: 0 0 20pt rgba(0, 0, 0, 0.5);
+  position: relative;
+  width: 300pt;
+  height: 300pt;
+  border-radius: 50%;
+  background-color: black;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 0 20pt rgba(0, 0, 0, 0.5);
 }
 
 .center-circle {
-    position: absolute;
-    width: 100pt;
-    height: 100pt;
-    background-color: #d97a00;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
+  position: absolute;
+  width: 100pt;
+  height: 100pt;
+  background-color: #d97a00;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
 }
 
 .play-pause-icon {
-    font-size: 48pt;
-    color: white;
+  font-size: 48pt;
+  color: white;
 }
 
 .text-container {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .spinning-text {
-    animation: text-spin 10s linear infinite;
+  animation: text-spin 10s linear infinite;
 }
 
 @keyframes text-spin {
-    from {
-        transform: translate(-50%, -50%) rotate(0deg);
-    }
-    to {
-        transform: translate(-50%, -50%) rotate(360deg);
-    }
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
 }
 
 .time-container {
-    margin-top: 20pt;
-    font-family: Arial, sans-serif;
-    color: #333;
+  margin-top: 20pt;
+  font-family: Arial, sans-serif;
+  color: #333;
 }

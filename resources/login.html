@@ -1,37 +1,47 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-  <title>JARI Loginpage</title>
-  <link href="./fonts/font-awesome/css/fontawesome.css" rel="stylesheet" />
-  <link href="./fonts/font-awesome/css/solid.css" rel="stylesheet" />
-  <link rel="stylesheet" href="./css/index.css" />
-  <script src="login.js"></script>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="google-auth.js" defer></script>
-</head>
-<body>
-<header class="header" style="background-color: rgb(100, 99, 99)">
-  <a id="text" href="start.html" class="title" style="color: rgb(243, 146, 0)">JARI</a>
-  <button class="button1" onclick="window.location.href='login.html'">Go to Login</button>
-</header>
-<main>
-  <section id="login">
-    <form onsubmit="handleLogin(event)">
-      <label for="email">E-Mail:</label>
-      <input type="email" id="email" name="email" required />
-      <br /><br />
-      <label for="password">Password:</label>
-      <input type="password" id="password" name="password" required />
-      <br /><br />
-      <button type="submit">Login</button>
-    </form>
-    <div id="g_id_onload"
-         data-client_id="YOUR_CLIENT_ID"
-         data-callback="handleCredentialResponse"
-         data-auto_prompt="false">
-    </div>
-    <div class="g_id_signin" data-type="standard"></div> <!-- Google Sign-In button -->
-  </section>
-</main>
-</body>
+  <head>
+    <title>JARI Loginpage</title>
+    <link href="./fonts/font-awesome/css/fontawesome.css" rel="stylesheet" />
+    <link href="./fonts/font-awesome/css/solid.css" rel="stylesheet" />
+    <link rel="stylesheet" href="./css/index.css" />
+    <script src="login.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="google-auth.js" defer></script>
+  </head>
+  <body>
+    <header class="header" style="background-color: rgb(100, 99, 99)">
+      <a
+        id="text"
+        href="start.html"
+        class="title"
+        style="color: rgb(243, 146, 0)"
+        >JARI</a
+      >
+      <button class="button1" onclick="window.location.href='login.html'">
+        Go to Login
+      </button>
+    </header>
+    <main>
+      <section id="login">
+        <form onsubmit="handleLogin(event)">
+          <label for="email">E-Mail:</label>
+          <input type="email" id="email" name="email" required />
+          <br /><br />
+          <label for="password">Password:</label>
+          <input type="password" id="password" name="password" required />
+          <br /><br />
+          <button type="submit">Login</button>
+        </form>
+        <div
+          id="g_id_onload"
+          data-client_id="YOUR_CLIENT_ID"
+          data-callback="handleCredentialResponse"
+          data-auto_prompt="false"
+        ></div>
+        <div class="g_id_signin" data-type="standard"></div>
+        <!-- Google Sign-In button -->
+      </section>
+    </main>
+  </body>
 </html>
