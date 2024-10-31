@@ -45,6 +45,8 @@ struct Args {
     threads: Option<usize>,
     #[command(subcommand)]
     tls: Option<TlsArgs>,
+    #[arg(short, long)]
+    data_dir: Option<PathBuf>,
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -344,7 +346,7 @@ fn main() -> std::io::Result<()> {
                 users: RwLock::new(HashMap::new()),
             });
 
-            let data_dir = PathBuf::from("./data");
+            let data_dir = args.data_dir.unwrap_or(PathBuf::from("./data"));
             // Load radio state
             let mut blocking_radio_map = HashMap::new();
             if let Ok(state_file) = tokio::fs::read(data_dir.join("state")).await {
