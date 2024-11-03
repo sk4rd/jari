@@ -6,7 +6,7 @@ file_upload.addEventListener("change", () => {
     let id = rx.exec(document.URL)[1];
     let form = new FormData();
     form.append("file", file);
-    fetch("/" + id + "/songs/" + file.name, {method: "PUT", body: form})
+    fetch("/" + id + "/songs/" + file.name, {method: "PUT", body: form, headers: {"Authorization": localStorage.getItem("JWT")}})
 })
 
 
@@ -17,6 +17,6 @@ function get_edit_content(){
     console.log(description)
     let rx = /([^\/]*)\/edit/g;
     let id = rx.exec(document.URL)[1];
-    fetch("/" + id, {method:"POST", body: JSON.stringify({title, description}), headers: {"Content-Type":"application/json"}})
+    fetch("/" + id, {method:"POST", body: JSON.stringify({title, description}), headers: {"Content-Type":"application/json", "Authorization": localStorage.getItem("JWT")}})
 }
 
