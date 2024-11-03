@@ -13,6 +13,7 @@ struct Args {
 enum Command {
     RemoveSong { radio: String, song: String },
     RemoveRadio { radio: String },
+    CountUsers,
     ListRadios,
     ListSongs { radio: String },
     ReloadPages { path: PathBuf },
@@ -29,6 +30,7 @@ enum Command {
 trait CliListener {
     fn remove_song(&self, radio: String, song: String) -> Result<String>;
     fn remove_radio(&self, radio: String) -> Result<String>;
+    fn count_users(&self) -> Result<usize>;
     fn list_radios(&self) -> Result<Vec<String>>;
     fn list_songs(&self, radio: String) -> Result<Vec<String>>;
     fn reload_pages(&self, path: PathBuf) -> Result<String>;
@@ -45,6 +47,7 @@ fn main() {
     let res = match args.command {
         Command::RemoveSong { radio, song } => client.remove_song(radio, song),
         Command::RemoveRadio { radio } => client.remove_radio(radio),
+        Command::CountUsers => client.count_users().map(|x| format!("{x}")),
         Command::ListRadios => client.list_radios().map(|x| {
             x.into_iter()
                 .reduce(|a, e| format!("{a}\n{e}"))

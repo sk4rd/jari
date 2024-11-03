@@ -184,6 +184,9 @@ impl CliListener {
         };
         format!("Removed radio {radio}")
     }
+    async fn count_users(&self) -> usize {
+        self.state.users.read().await.len()
+    }
     async fn list_radios(&self) -> Vec<String> {
         self.state
             .radio_states
