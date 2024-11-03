@@ -40,3 +40,31 @@
 #settings button:hover {
   background-color: #d97a00;
 }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+th, td {
+  padding: 12px;
+  text-align: left;
+  border: 1px solid #ddd;
+}
+
+th {
+  background-color: #f2f2f2;
+}
+
+tr:hover {
+  background-color: #f1f1f1;
+}
+
+.button1 {
+  margin: 5px;
+}
+
+#song-queue td button {
+  margin: 2px;
+}
