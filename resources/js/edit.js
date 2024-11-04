@@ -28,6 +28,27 @@ fetch("/" + id + "/order").then((res) => {
         updateSongQueue()
     })
 })
+
+
+function getSongs() {
+    fetch("/" + id + "/songs").then((res) => res.json().then((res) => {
+        let selections = document.getElementById("selections");
+        for (let i = 0; i < res.length; i++) {
+            let option = new Option();
+            option.value = res[i];
+            option.innerText = res[i];
+            selections.add(option);
+        }
+    }))
+}
+getSongs()
+
+function addSong() {
+    let selections = document.getElementById("selections");
+    songQueue.push(selections.selectedOptions[0].value);
+    updateSongQueue();
+}
+
 function removeSong(index) {
     songQueue.splice(index, 1);
     updateSongQueue();
