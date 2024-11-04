@@ -33,6 +33,7 @@ fetch("/" + id + "/order").then((res) => {
 function getSongs() {
     fetch("/" + id + "/songs").then((res) => res.json().then((res) => {
         let selections = document.getElementById("selections");
+        selections.innerHTML = "";
         for (let i = 0; i < res.length; i++) {
             let option = new Option();
             option.value = res[i];
@@ -42,6 +43,12 @@ function getSongs() {
     }))
 }
 getSongs()
+
+function deleteSong() {
+    let selections = document.getElementById("selections");
+    let song = selections.selectedOptions[0].value;
+    fetch("/" + id + "/songs/" + song, {method: "DELETE", headers: {"Authorization": localStorage.getItem("JWT")}}).then(getSongs)
+}
 
 function addSong() {
     let selections = document.getElementById("selections");
