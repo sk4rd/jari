@@ -38,13 +38,23 @@
         <input type="file" id="upload" />
       </div>
       <div class="input-ctrl-cont" style="margin-top: auto">
-        <div
-          id="order-list"
-          class="input"
-          style="height: 200pt; border: solid black 0.5pt"
-        ></div>
+        <table id="song-queue">
+          <thead>
+          <tr>
+            <th>Song Title</th>
+            <th>Action</th>
+          </tr>
+          </thead>
+          <tbody>
+          </tbody>
+        </table>
+        <!-- <div -->
+          <!-- id="order-list" -->
+          <!-- class="input" -->
+          <!-- style="height: 200pt; border: solid black 0.5pt" -->
+        <!-- ></div> -->
         <div class="ctrl">
-          <button>Set Order</button>
+          <button onclick="setOrder()">Set Order</button>
           <select id="selections" style="min-width: 100pt"></select>
         </div>
       </div>
