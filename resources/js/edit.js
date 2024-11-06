@@ -8,6 +8,10 @@ file_upload.addEventListener("change", () => {
     form.append("file", file);
     fetch("/" + id + "/songs/" + file.name, {method: "PUT", body: form, headers: {"Authorization": localStorage.getItem("JWT")}})
 })
+if (localStorage.getItem("jwt")) {
+    document.getElementById("navbutton").onclick = () => window.location.href="/auth/settings";
+    document.getElementById("navbutton").innerText = "Settings"
+}
 
 
 function get_edit_content(){
