@@ -1,5 +1,5 @@
 use actix::Response;
-use actix_web::HttpResponse;
+use actix_web::{FromRequest, HttpResponse};
 use futures::io::Empty;
 use openidconnect::reqwest::async_http_client;
 use openidconnect::{
@@ -21,6 +21,7 @@ use openidconnect::{
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::env;
+use std::future::{ready, Ready};
 use std::sync::Arc;
 
 use crate::errors::PageError;
@@ -37,6 +38,28 @@ pub struct RedirectResponse {
     pub state: String,
     pub code: String,
     pub scope: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct Token(pub Option<String>);
+
+impl Token {
+    pub fn into_inner(self) -> Option<String> {
+        self.0
+    }
+}
+
+impl FromRequest for Token {
+    type Error = PageError;
+    type Future = Ready<Result<Self, Self::Error>>;
+    fn from_request(req: &actix_web::HttpRequest, _: &mut actix_web::dev::Payload) -> Self::Future {
+        let token = req
+            .headers()
+            .get(actix_web::http::header::AUTHORIZATION)
+            .and_then(|x| x.to_str().ok())
+            .map(|x| x.to_owned());
+        ready(Ok(Self(token)))
+    }
 }
 
 impl OidcClient {
