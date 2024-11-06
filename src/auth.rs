@@ -1,12 +1,13 @@
 use actix::Response;
 use actix_web::{FromRequest, HttpResponse};
 use futures::io::Empty;
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use openidconnect::reqwest::async_http_client;
 use openidconnect::{
     core::{CoreAuthenticationFlow, CoreClient, CoreProviderMetadata},
     ClientId, ClientSecret, IssuerUrl,
 };
-use openidconnect::{AuthPrompt, PkceCodeVerifier, RedirectUrl};
+use openidconnect::{AuthPrompt, PkceCodeVerifier, RedirectUrl, SubjectIdentifier};
 
 use actix_web::{
     routes,
@@ -18,19 +19,34 @@ use openidconnect::{
     AccessTokenHash, AuthenticationFlow, AuthorizationCode, CsrfToken, Nonce, OAuth2TokenResponse,
     PkceCodeChallenge, Scope, TokenResponse,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 use std::env;
+use std::fmt::Debug;
 use std::future::{ready, Ready};
 use std::sync::Arc;
 
 use crate::errors::PageError;
 use crate::AppState;
 
-#[derive(Debug)]
 pub struct OidcClient {
     pub client: CoreClient,
     pub active_requests: tokio::sync::Mutex<HashMap<String, (PkceCodeVerifier, Nonce)>>,
+    pub encoding_key: EncodingKey,
+    pub decoding_key: DecodingKey,
+    pub validation: Validation,
+    pub header: Header,
+}
+
+impl Debug for OidcClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OidcClient")
+            .field("client", &self.client)
+            .field("active_requests", &self.active_requests)
+            .field("validation", &self.validation)
+            .field("header", &self.header)
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -38,6 +54,11 @@ pub struct RedirectResponse {
     pub state: String,
     pub code: String,
     pub scope: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Claims {
+    pub sub: SubjectIdentifier,
 }
 
 #[derive(Debug, Clone)]
@@ -84,15 +105,36 @@ impl OidcClient {
         let redirect_url = RedirectUrl::new("https://jari.sk4rd.com/auth/callback".to_string())
             .expect("Invalid redirect URL");
 
-        let client =
-            CoreClient::from_provider_metadata(provider_metadata, client_id, Some(client_secret))
-                .set_redirect_uri(redirect_url);
+        let client = CoreClient::from_provider_metadata(
+            provider_metadata,
+            client_id,
+            Some(client_secret.clone()),
+        )
+        .set_redirect_uri(redirect_url);
+
+        // Json Web Token
+        let encoding_key =
+            EncodingKey::from_base64_secret(client_secret.secret()).expect("Not a base64 Key");
+        let decoding_key =
+            DecodingKey::from_base64_secret(client_secret.secret()).expect("Not a base64 Key");
+        let validation = Validation::new(jsonwebtoken::Algorithm::HS256);
+        let header = Header::new(jsonwebtoken::Algorithm::HS256);
 
         OidcClient {
             client,
             active_requests: tokio::sync::Mutex::new(HashMap::new()),
+            encoding_key,
+            decoding_key,
+            validation,
+            header,
         }
     }
+}
+
+pub fn decode_token(token: &str, oidc_client: &OidcClient) -> Option<SubjectIdentifier> {
+    decode::<Claims>(token, &oidc_client.decoding_key, &oidc_client.validation)
+        .ok()
+        .map(|x| x.claims.sub)
 }
 
 #[routes]
@@ -171,24 +213,28 @@ pub async fn google_callback(
         }
     }
 
-    state
-        .users
-        .write()
-        .await
-        .insert(claims.subject().clone(), None);
+    let sub = claims.subject().clone();
 
-    Ok(HttpResponse::Ok().body(
+    let token = encode(
+        &state.oidc_client.header,
+        &Claims { sub: sub.clone() },
+        &state.oidc_client.encoding_key,
+    )
+    .map_err(|_| PageError::InternalError)?;
+
+    state.users.write().await.insert(sub.clone(), None);
+
+    Ok(HttpResponse::Ok().body(format!(
         "
         <!DOCTYPE html>
         <html>
             <body>
                 <script>
-                    const searchParams = new URLSearchParams(window.location.search);
-                    localStorage.setItem('JWT', searchParams.get('code'));
+                    localStorage.setItem('JWT', searchParams.get('{token}'));
                     window.location.href = '/';
                 </script>
             </body>
         </html>
-        ",
-    ))
+        "
+    )))
 }
