@@ -427,6 +427,7 @@ fn main() -> std::io::Result<()> {
                         .service(get_songs)
                         .service(get_song_order)
                         .service(set_song_order)
+                        .service(remove_user)
                         .service(remove_radio)
                         .service(remove_song)
                         .service(get_audio)

@@ -462,6 +462,39 @@ pub async fn set_song_order(
     Ok(HttpResponse::Ok().body(format!("Update song order of radio with ID {}", radio_id)))
 }
 
+#[delete("/auth/user")]
+pub async fn remove_user(
+    state: web::Data<Arc<AppState>>,
+    Token(token): Token,
+) -> Result<HttpResponse, PageError> {
+    let sub = decode_token(&token.ok_or(PageError::AuthError)?, &state.oidc_client)
+        .ok_or(PageError::AuthError)?;
+
+    let radios = state
+        .users
+        .write()
+        .await
+        .remove(&sub)
+        .ok_or(PageError::NotFound)?;
+
+    let mut radio_states = state.radio_states.write().await;
+    for radio in radios {
+        radio_states.remove(&radio);
+        let Ok(()) = state
+            .to_blocking
+            .send(ToBlocking::RemoveRadio {
+                radio: radio.clone(),
+            })
+            .map_err(PageError::from)
+        else {
+            eprintln!("Couldn't remove radio {radio} from blocking");
+            continue;
+        };
+    }
+
+    Ok(HttpResponse::Ok().body("Deleted User"))
+}
+
 #[delete("/{radio}")]
 pub async fn remove_radio(
     path: web::Path<String>,
