@@ -1,3 +1,4 @@
+use crate::auth::{decode_token, Token};
 use crate::blocking::ToBlocking;
 use crate::errors::PageError;
 use crate::{AppState, Config, PartialConfig, RadioState, SentConfig, BANDWIDTHS, NUM_BANDWIDTHS};
@@ -108,7 +109,6 @@ pub async fn get_auth_page(state: web::Data<Arc<AppState>>) -> impl Responder {
     HttpResponse::Ok().body(state.pages.read().await[3].clone())
 }
 
-// TODO(auth): automatically set account based on token
 #[routes]
 #[get("/auth/settings")]
 #[get("/auth/settings/")]
@@ -172,7 +172,6 @@ pub async fn get_radio_edit_page(
     ))
 }
 
-// TODO(auth): verify user owns radio
 #[routes]
 #[post("/{radio}")]
 #[post("/{radio}/")]
@@ -180,12 +179,19 @@ pub async fn set_radio_config(
     path: web::Path<String>,
     web::Json(partial_config): web::Json<PartialConfig>,
     state: web::Data<Arc<AppState>>,
+    Token(token): Token,
 ) -> Result<HttpResponse, PageError> {
     let id = path.into_inner();
     let radio_states = state.radio_states.write().await;
     let radio_state = radio_states.get(&id).ok_or(PageError::NotFound)?;
-
     let mut radio_state_locked = radio_state.write().await;
+
+    let sub = decode_token(&token.ok_or(PageError::AuthError)?, &state.oidc_client)
+        .ok_or(PageError::AuthError)?;
+    if sub != radio_state_locked.owner {
+        Err(PageError::AuthError)?
+    }
+
     if let Some(title) = &partial_config.title {
         radio_state_locked.config.title = title.into();
     }
@@ -199,12 +205,12 @@ pub async fn set_radio_config(
     )))
 }
 
-// TODO(auth): assign radio to user
 #[put("/{radio}")]
 pub async fn add_radio(
     path: web::Path<String>,
     web::Json(config): web::Json<SentConfig>,
     state: web::Data<Arc<AppState>>,
+    Token(token): Token,
 ) -> Result<HttpResponse, PageError> {
     let id = path.into_inner();
     let mut radio_states = state.radio_states.write().await;
@@ -212,6 +218,20 @@ pub async fn add_radio(
     if radio_states.contains_key(&id) {
         return Err(PageError::NotFound.into());
     }
+
+    let sub = decode_token(
+        &dbg!(token).ok_or(PageError::AuthError)?,
+        &state.oidc_client,
+    )
+    .ok_or(PageError::AuthError)?;
+
+    state
+        .users
+        .write()
+        .await
+        .get_mut(&sub)
+        .ok_or(PageError::NotFound)?
+        .push(id.clone());
 
     let (tx, rx) = watch::channel((vec![], [(); NUM_BANDWIDTHS].map(|_| vec![])));
 
@@ -223,6 +243,7 @@ pub async fn add_radio(
         stream: rx,
         song_map: HashMap::new(),
         song_order: Vec::new(),
+        owner: sub,
     };
 
     radio_states.insert(id.clone(), RwLock::new(new_radio_state));
@@ -297,7 +318,6 @@ pub async fn get_audio_band(
         .streaming(stream))
 }
 
-// TODO(auth): verify user owns radio
 #[routes]
 #[put("/{radio}/songs/{song}")]
 #[put("/{radio}/songs/{song}/")]
@@ -305,10 +325,22 @@ pub async fn upload_song(
     path: web::Path<(String, String)>,
     mut payload: Multipart,
     state: web::Data<Arc<AppState>>,
+    Token(token): Token,
 ) -> Result<HttpResponse, PageError> {
     let (radio_id, song_id) = path.into_inner();
     let mut song_data: Vec<u8> = Vec::new();
     let radio_states = state.radio_states.read().await;
+    let mut radio_state = radio_states
+        .get(&radio_id)
+        .ok_or(PageError::NotFound)?
+        .write()
+        .await;
+
+    let sub = decode_token(&token.ok_or(PageError::AuthError)?, &state.oidc_client)
+        .ok_or(PageError::AuthError)?;
+    if sub != radio_state.owner {
+        Err(PageError::AuthError)?
+    }
 
     // Process each part in the multipart payload
     while let Some(item) = payload.next().await {
@@ -325,12 +357,6 @@ pub async fn upload_song(
             }
         }
     }
-
-    let mut radio_state = radio_states
-        .get(&radio_id)
-        .ok_or(PageError::NotFound)?
-        .write()
-        .await;
 
     let id = radio_state
         .song_map
@@ -395,7 +421,6 @@ pub async fn get_song_order(
     Ok(web::Json(radio_state.song_order.clone()))
 }
 
-// TODO(auth): verify user owns radio
 #[routes]
 #[put("/{radio}/order")]
 #[put("/{radio}/order/")]
@@ -403,6 +428,7 @@ pub async fn set_song_order(
     path: web::Path<String>,
     payload: web::Json<Vec<String>>,
     state: web::Data<Arc<AppState>>,
+    Token(token): Token,
 ) -> Result<HttpResponse, PageError> {
     let radio_id = path.into_inner();
     let radio_states = state.radio_states.read().await;
@@ -411,6 +437,12 @@ pub async fn set_song_order(
         .ok_or(PageError::ResourceNotFound)?
         .write()
         .await;
+
+    let sub = decode_token(&token.ok_or(PageError::AuthError)?, &state.oidc_client)
+        .ok_or(PageError::AuthError)?;
+    if sub != radio_state.owner {
+        Err(PageError::AuthError)?
+    }
 
     radio_state.song_order = payload.into_inner();
 
@@ -430,18 +462,26 @@ pub async fn set_song_order(
     Ok(HttpResponse::Ok().body(format!("Update song order of radio with ID {}", radio_id)))
 }
 
-// TODO(auth): verify user owns radio
 #[delete("/{radio}")]
 pub async fn remove_radio(
     path: web::Path<String>,
     state: web::Data<Arc<AppState>>,
+    Token(token): Token,
 ) -> Result<HttpResponse, PageError> {
     let id = path.into_inner();
     let mut radio_states = state.radio_states.write().await;
 
-    // Throw NotFound if page with id was not found
-    if !radio_states.contains_key(&id) {
-        return Err(PageError::NotFound.into());
+    let sub = decode_token(&token.ok_or(PageError::AuthError)?, &state.oidc_client)
+        .ok_or(PageError::AuthError)?;
+    if sub
+        != radio_states
+            .get(&id)
+            .ok_or(PageError::NotFound)?
+            .read()
+            .await
+            .owner
+    {
+        Err(PageError::AuthError)?
     }
 
     radio_states.remove(&id);
@@ -453,11 +493,11 @@ pub async fn remove_radio(
     Ok(HttpResponse::Ok().body(format!("Radio with ID {} has been removed", id)))
 }
 
-// TODO(auth): verify user owns radio
 #[delete("/{radio}/songs/{song}")]
 pub async fn remove_song(
     path: web::Path<(String, String)>,
     state: web::Data<Arc<AppState>>,
+    Token(token): Token,
 ) -> Result<HttpResponse, PageError> {
     let (radio_id, song_name) = path.into_inner();
     let radio_states = state.radio_states.read().await;
@@ -466,6 +506,12 @@ pub async fn remove_song(
         .ok_or(PageError::NotFound)?
         .read()
         .await;
+
+    let sub = decode_token(&token.ok_or(PageError::AuthError)?, &state.oidc_client)
+        .ok_or(PageError::AuthError)?;
+    if sub != radio_state.owner {
+        Err(PageError::AuthError)?
+    }
 
     state
         .to_blocking

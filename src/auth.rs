@@ -25,6 +25,7 @@ use std::env;
 use std::fmt::Debug;
 use std::future::{ready, Ready};
 use std::sync::Arc;
+use std::time::Instant;
 
 use crate::errors::PageError;
 use crate::AppState;
@@ -59,6 +60,7 @@ pub struct RedirectResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: SubjectIdentifier,
+    pub exp: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -217,12 +219,20 @@ pub async fn google_callback(
 
     let token = encode(
         &state.oidc_client.header,
-        &Claims { sub: sub.clone() },
+        &Claims {
+            sub: sub.clone(),
+            exp: jsonwebtoken::get_current_timestamp() as usize + 7 * 24 * 60 * 60,
+        },
         &state.oidc_client.encoding_key,
     )
     .map_err(|_| PageError::InternalError)?;
 
-    state.users.write().await.insert(sub.clone(), None);
+    state
+        .users
+        .write()
+        .await
+        .entry(sub.clone())
+        .or_insert(vec![]);
 
     Ok(HttpResponse::Ok().body(format!(
         "
@@ -230,7 +240,7 @@ pub async fn google_callback(
         <html>
             <body>
                 <script>
-                    localStorage.setItem('JWT', searchParams.get('{token}'));
+                    localStorage.setItem('JWT', '{token}');
                     window.location.href = '/';
                 </script>
             </body>

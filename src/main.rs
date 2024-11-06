@@ -115,6 +115,7 @@ pub struct RadioState {
     stream: watch::Receiver<(Vec<u8>, [Vec<u8>; NUM_BANDWIDTHS])>,
     song_map: HashMap<String, u8>,
     song_order: Vec<String>,
+    owner: SubjectIdentifier,
 }
 /// Serializable Data for saving radio state
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -122,6 +123,7 @@ pub struct PersistentRadioState {
     config: SentConfig,
     song_map: HashMap<String, u8>,
     song_order: Vec<String>,
+    owner: SubjectIdentifier,
 }
 /// Global async app state
 #[derive(Debug)]
@@ -130,12 +132,13 @@ pub struct AppState {
     to_blocking: tokio::sync::mpsc::UnboundedSender<ToBlocking>,
     radio_states: RwLock<HashMap<String, RwLock<RadioState>>>,
     oidc_client: Arc<OidcClient>,
-    users: RwLock<HashMap<SubjectIdentifier, Option<String>>>,
+    users: RwLock<HashMap<SubjectIdentifier, Vec<String>>>,
 }
 /// Serializeble app state
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PersistentAppState {
     radio_states: HashMap<String, PersistentRadioState>,
+    users: HashMap<SubjectIdentifier, Vec<String>>,
 }
 
 struct CliListener {
@@ -295,6 +298,7 @@ async fn save_state(data: Arc<AppState>, data_dir: PathBuf) {
             stream: _,
             song_map,
             song_order,
+            owner,
         } = radio_state.get_mut().clone();
         persistent_radio_states.insert(
             name.clone(),
@@ -305,11 +309,13 @@ async fn save_state(data: Arc<AppState>, data_dir: PathBuf) {
                 },
                 song_map,
                 song_order,
+                owner,
             },
         );
     }
     let state = PersistentAppState {
         radio_states: persistent_radio_states,
+        users: data.users.read().await.clone(),
     };
     let state_buf = postcard::to_allocvec(&state).unwrap();
     tokio::fs::write(data_dir.join("state"), state_buf)
@@ -359,6 +365,7 @@ fn main() -> std::io::Result<()> {
                         config,
                         song_map,
                         song_order,
+                        owner
                     },
                 ) in loaded_state.radio_states.into_iter()
                 {
@@ -383,6 +390,7 @@ fn main() -> std::io::Result<()> {
                             stream: rx,
                             song_map,
                             song_order,
+                            owner
                         }),
                     );
                 }
