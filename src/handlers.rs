@@ -219,11 +219,8 @@ pub async fn add_radio(
         return Err(PageError::NotFound.into());
     }
 
-    let sub = decode_token(
-        &dbg!(token).ok_or(PageError::AuthError)?,
-        &state.oidc_client,
-    )
-    .ok_or(PageError::AuthError)?;
+    let sub = decode_token(&token.ok_or(PageError::AuthError)?, &state.oidc_client)
+        .ok_or(PageError::AuthError)?;
 
     state
         .users
@@ -335,6 +332,10 @@ pub async fn upload_song(
         .ok_or(PageError::NotFound)?
         .write()
         .await;
+
+    if radio_state.song_map.contains_key(&song_id) {
+        Err(PageError::NotFound)?
+    }
 
     let sub = decode_token(&token.ok_or(PageError::AuthError)?, &state.oidc_client)
         .ok_or(PageError::AuthError)?;
@@ -534,10 +535,10 @@ pub async fn remove_song(
 ) -> Result<HttpResponse, PageError> {
     let (radio_id, song_name) = path.into_inner();
     let radio_states = state.radio_states.read().await;
-    let radio_state = radio_states
+    let mut radio_state = radio_states
         .get(&radio_id)
         .ok_or(PageError::NotFound)?
-        .read()
+        .write()
         .await;
 
     let sub = decode_token(&token.ok_or(PageError::AuthError)?, &state.oidc_client)
@@ -557,6 +558,8 @@ pub async fn remove_song(
                 .clone(),
         })
         .expect("Couldn't send to backend");
+    radio_state.song_map.remove(&song_name);
+    radio_state.song_order.retain(|e| e != &song_name);
 
     Ok(HttpResponse::Ok().body(format!(
         "Remove song '{}' from radio with ID {}",

@@ -4,11 +4,12 @@ const id = rx.exec(document.URL)[1];
 let file_upload = document.getElementById("upload");
 file_upload.addEventListener("change", () => {
     for (let i = 0; i < file_upload.files.length; i++) {
-        let file = file_upload.files[0];
+        let file = file_upload.files[i];
         let form = new FormData();
         form.append("file", file);
         fetch("/" + id + "/songs/" + file.name, {method: "PUT", body: form, headers: {"Authorization": localStorage.getItem("JWT")}})
     }
+    getSongs()
 })
 if (localStorage.getItem("jwt")) {
     document.getElementById("navbutton").onclick = () => window.location.href="/auth/settings";

@@ -187,6 +187,47 @@ impl CliListener {
         };
         format!("Removed radio {radio}")
     }
+    async fn remove_user(&mut self, sub: String) -> String {
+        let Some(_) = self
+            .state
+            .users
+            .write()
+            .await
+            .remove(&SubjectIdentifier::new(sub.clone()))
+        else {
+            return format!("Err! No user with sub: {sub}");
+        };
+        format!("Removed user with sub: {sub}")
+    }
+    async fn add_user(&self, sub: String) -> String {
+        let Ok(token) = jsonwebtoken::encode(
+            &self.state.oidc_client.header,
+            &auth::Claims {
+                sub: SubjectIdentifier::new(sub.clone()),
+                exp: jsonwebtoken::get_current_timestamp() as usize + 7 * 24 * 60 * 60,
+            },
+            &self.state.oidc_client.encoding_key,
+        ) else {
+            return format!("Couldn't generate token");
+        };
+
+        self.state
+            .users
+            .write()
+            .await
+            .entry(SubjectIdentifier::new(sub.clone()))
+            .or_insert(vec![]);
+        format!("Added user with sub {sub}. Token: {token}")
+    }
+    async fn list_users(&self) -> Vec<String> {
+        self.state
+            .users
+            .read()
+            .await
+            .iter()
+            .map(|(key, val)| format!("Sub: {}, radios: {val:?}", key.to_string()))
+            .collect_vec()
+    }
     async fn count_users(&self) -> usize {
         self.state.users.read().await.len()
     }
