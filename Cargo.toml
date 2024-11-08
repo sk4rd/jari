@@ -22,7 +22,7 @@ tokio = { version = "1.36.0", features = ["full"] }
 tokio-stream = {version = "0.1.15", features = ["sync"]}
 id3 = { version = "1.13.1", features = ["tokio"] }
 byteorder = "1.5.0"
-symphonia = { version = "0.5.4", features = ["all-codecs"] }
+symphonia = { version = "0.5.4", features = ["all-codecs", "all-formats"] }
 rayon = "1.10.0"
 itertools = "0.13.0"
 fdk-aac = "0.6.0"
