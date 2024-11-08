@@ -435,6 +435,7 @@ fn main() -> std::io::Result<()> {
                         }),
                     );
                 }
+                *data.users.write().await = loaded_state.users;
             }
 
             // Start blocking thread
