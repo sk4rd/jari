@@ -387,6 +387,14 @@ pub fn main(
                         })
                         .find(|(_, offset, _)| *offset >= time)
                     else {
+                        let silence = include_bytes!("silence.aac");
+                        let Ok(_) = stream.send((
+                            silence.to_vec(),
+                            [(); NUM_BANDWIDTHS].map(|_| silence.to_vec()),
+                        )) else {
+                            eprintln!("Couldn't send silence to radio {name}");
+                            return;
+                        };
                         return;
                     };
                     let time = time - (offset - len);
