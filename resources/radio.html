@@ -9,11 +9,24 @@
     <link href="./fonts/font-awesome/css/solid.css" rel="stylesheet" />
     <!-- External CSS -->
     <link rel="stylesheet" href="./css/index.css" />
+    <link rel="stylesheet" href="./css/radio.css" />
     <!-- HLS.js Library -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="./js/radioplayer.js" defer></script>
   </head>
   <body>
+    <ul class="background">
+      <li></li>
+      <li></li>
+      <li></li>
+      <li></li>
+      <li></li>
+      <li></li>
+      <li></li>
+      <li></li>
+      <li></li>
+      <li></li>
+    </ul>
     <header class="header" style="background-color: rgb(100, 99, 99)">
       <a
         id="text"
@@ -42,41 +55,38 @@
           </button>
         </form>
       </section>
-      <button id="navbutton" class="button1" onclick="window.location.href='login.html'">
+      <button
+        id="navbutton"
+        class="button1"
+        onclick="window.location.href='login.html'"
+      >
         Login
       </button>
     </header>
-    <div class="list-item2">
-      <div class="content">
-        <span class="header-radio">Radio: {title}</span>
-        <br />
-        <span class="description-radio">{description}</span>
-      </div>
-    </div>
-    <div class="record">
-      <div class="text-container" id="textContainer">
-        <svg width="100%" height="100%" viewBox="0 0 300 300">
-          <defs>
+    <div class="centered-container">
+      <div class="radio-title">{title}</div>
+      <div class="content-container">
+        <div class="record">
+          <div class="label" id="buttonPlay">
+            <div class="icon fa-solid fa-play"></div>
+          </div>
+          <svg viewBox="0 0 200 200" class="curved-text">
+            <!-- Define a circular path for the text to follow -->
             <path
               id="textPath"
-              d="M 150,150 m -100,0 a 100,100 0 1,0 200,0 a 100,100 0 1,0 -200,0"
-            />
-          </defs>
-          <text fill="white" font-size="24" font-family="Arial">
-            <textPath href="#textPath" startOffset="0" class="spinning-text">
-              JARI: {title}
-            </textPath>
-          </text>
-        </svg>
-      </div>
-      <div class="center-circle" id="playPauseButton">
-        <div class="play-pause-icon fa-solid fa-play"></div>
+              d="M 100, 100 m -80, 0 a 80,80 0 1,1 160,0 a 80,80 0 1,1 -160,0"
+            ></path>
+            <!-- Add text that follows the path -->
+            <text>
+              <textPath href="#textPath" startOffset="50%">
+                Radio: {title}
+              </textPath>
+            </text>
+          </svg>
+        </div>
+        <div class="description">{description}</div>
       </div>
     </div>
-    <div class="time-container">
-      <span id="currentTime">00:00</span> / <span id="totalTime">00:00</span>
-    </div>
-
-    <audio id="audio" controls src="/{id}/listen"></audio>
+    <audio id="audio" src="/{id}/listen"></audio>
   </body>
 </html>
