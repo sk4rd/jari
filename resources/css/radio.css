@@ -47,12 +47,6 @@
   margin-bottom: 20px;
 }
 
-/* Animation control when paused */
-.record.paused {
-  animation-play-state: paused;
-  /* Pauses the spinning animation */
-}
-
 /* Inner label */
 .label {
   width: 50px;
@@ -77,6 +71,12 @@
   height: 100%;
   top: 0;
   left: 0;
+  animation: 8s spin linear infinite;
+}
+
+/* Animation control when paused */
+.curved-text.paused {
+  animation-play-state: paused;
 }
 
 .icon {
