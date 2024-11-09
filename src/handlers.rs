@@ -188,6 +188,7 @@ pub async fn set_radio_config(
 
     let sub = decode_token(&token.ok_or(PageError::AuthError)?, &state.oidc_client)
         .ok_or(PageError::AuthError)?;
+    // IMPORTANT: this is only safe if no user can have the sub ADMIN (given with google)
     if sub != radio_state_locked.owner && sub.as_str() != "ADMIN" {
         Err(PageError::AuthError)?
     }
@@ -339,6 +340,7 @@ pub async fn upload_song(
 
     let sub = decode_token(&token.ok_or(PageError::AuthError)?, &state.oidc_client)
         .ok_or(PageError::AuthError)?;
+    // IMPORTANT: this is only safe if no user can have the sub ADMIN (given with google)
     if sub != radio_state.owner && sub.as_str() != "ADMIN" {
         Err(PageError::AuthError)?
     }
@@ -441,6 +443,7 @@ pub async fn set_song_order(
 
     let sub = decode_token(&token.ok_or(PageError::AuthError)?, &state.oidc_client)
         .ok_or(PageError::AuthError)?;
+    // IMPORTANT: this is only safe if no user can have the sub ADMIN (given with google)
     if sub != radio_state.owner && sub.as_str() != "ADMIN" {
         Err(PageError::AuthError)?
     }
@@ -514,6 +517,7 @@ pub async fn remove_radio(
             .read()
             .await
             .owner
+        // IMPORTANT: this is only safe if no user can have the sub ADMIN (given with google)
         && sub.as_str() != "ADMIN"
     {
         Err(PageError::AuthError)?
@@ -544,6 +548,7 @@ pub async fn remove_song(
 
     let sub = decode_token(&token.ok_or(PageError::AuthError)?, &state.oidc_client)
         .ok_or(PageError::AuthError)?;
+    // IMPORTANT: this is only safe if no user can have the sub ADMIN (given with google)
     if sub != radio_state.owner && sub.as_str() != "ADMIN" {
         Err(PageError::AuthError)?
     }
