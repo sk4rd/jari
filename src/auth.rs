@@ -116,9 +116,9 @@ impl OidcClient {
 
         // Json Web Token
         let encoding_key =
-            EncodingKey::from_base64_secret(client_secret.secret()).expect("Not a base64 Key");
+            EncodingKey::from_base64_secret(env::var("JWT_SECRET").expect("Missing JWT_SECRET").as_str()).expect("Not a base64 Key");
         let decoding_key =
-            DecodingKey::from_base64_secret(client_secret.secret()).expect("Not a base64 Key");
+            DecodingKey::from_base64_secret(env::var("JWT_SECRET").expect("Missing JWT_SECRET").as_str()).expect("Not a base64 Key");
         let validation = Validation::new(jsonwebtoken::Algorithm::HS256);
         let header = Header::new(jsonwebtoken::Algorithm::HS256);
 
