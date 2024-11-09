@@ -1,3 +1,5 @@
+@import './reset.css';
+
 body {
   font-family: Arial, sans-serif;
   margin: 0;
@@ -200,4 +202,3 @@ audio {
 label {
   color: #f39200ff;
 }
-
