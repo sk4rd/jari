@@ -41,7 +41,10 @@
   width: 200px;
   height: 200px;
   border-radius: 50%;
-  background: radial-gradient(circle, #000 60%, #333 95%, #222 98%);
+  background: radial-gradient(circle,
+      #000 0%, #111 4%, #000 8%, #111 12%, #000 16%, #111 20%, #000 24%, #111 28%, #000 32%, #111 36%, #000 40%,
+      #111 44%, #000 48%, #111 52%, #000 56%, #111 60%, #000 64%, #111 68%, #000 72%, #111 76%, #000 80%,
+      #111 84%, #000 88%, #111 92%, #000 96%, #111 100%);
   position: relative;
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5);
   margin-bottom: 20px;
