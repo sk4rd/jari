@@ -68,14 +68,18 @@
       <div class="radio-title">{title}</div>
       <div class="content-container">
         <div class="record">
-          <div class="label" id="buttonPlay">
-            <div class="icon fa-solid fa-play"></div>
+          <div class="label-container">
+            <div class="label" id="buttonPlay">
+              <div class="icon fa-solid fa-play"></div>
+            </div>
           </div>
           <svg viewBox="0 0 200 200" class="curved-text paused">
             <!-- Define a circular path for the text to follow -->
             <path
               id="textPath"
               d="M 100, 100 m -80, 0 a 80,80 0 1,1 160,0 a 80,80 0 1,1 -160,0"
+              fill="none"
+              stroke="none"
             ></path>
             <!-- Add text that follows the path -->
             <text>
