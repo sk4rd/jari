@@ -175,16 +175,10 @@ input[type="text"] {
   margin-bottom: 2pt;
 }
 
-.list-item img {
-  width: 80pt;
-  height: 80pt;
-  border: 1pt solid #d97a00;
-  margin: 10pt;
-}
-
 .list-item .content {
   display: flex;
   flex-direction: column;
+  margin: 10pt;
   margin-bottom: 2pt;
 }
 
